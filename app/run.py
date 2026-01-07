@@ -66,7 +66,7 @@ def get_app_ver():
 
 
 # 文件路径
-PYTHON_PATH = "python3" if os.path.exists("/usr/bin/python3") else "python"
+PYTHON_PATH = os.environ.get("PYTHON_PATH", sys.executable)
 SCRIPT_PATH = os.environ.get("SCRIPT_PATH", "./quark_auto_save.py")
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "./config/quark_config.json")
 PLUGIN_FLAGS = os.environ.get("PLUGIN_FLAGS", "")
@@ -178,6 +178,8 @@ def get_data():
         return jsonify({"success": False, "message": "未登录"})
     data = Config.read_json(CONFIG_PATH)
     del data["webui"]
+    if not data.get("smart_tasklist"):
+        data["smart_tasklist"] = []
     data["api_token"] = get_login_token()
     data["task_plugins_config_default"] = task_plugins_config_default
     return jsonify({"success": True, "data": data})
@@ -228,6 +230,11 @@ def run_script_now():
             )
         if tasklist:
             process_env["TASKLIST"] = json.dumps(tasklist, ensure_ascii=False)
+        smart_tasklist = request.json.get("smart_tasklist", [])
+        if smart_tasklist:
+            process_env["SMART_TASKLIST"] = json.dumps(
+                smart_tasklist, ensure_ascii=False
+            )
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,

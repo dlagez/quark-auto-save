@@ -17,6 +17,8 @@ import requests
 import importlib
 import traceback
 import urllib.parse
+import base64
+import copy
 from datetime import datetime
 from natsort import natsorted
 
@@ -27,6 +29,17 @@ except:
     print("正在尝试自动安装依赖...")
     os.system("pip3 install treelib &> /dev/null")
     from treelib import Tree
+
+
+app_dir = os.path.join(os.path.dirname(__file__), "app")
+if os.path.isdir(app_dir) and app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
+try:
+    from sdk.cloudsaver import CloudSaver
+    from sdk.pansou import PanSou
+except Exception:
+    CloudSaver = None
+    PanSou = None
 
 
 CONFIG_DATA = {}
@@ -56,6 +69,195 @@ def add_notify(text):
     NOTIFYS.append(text)
     print("📢", text)
     return text
+
+
+def _find_episode_numbers(name):
+    patterns = [
+        r"[Ss]\d{1,2}[Ee](\d{1,3})",
+        r"\bEP?\s*(\d{1,3})\b",
+        r"\u7b2c\s*(\d{1,3})\s*(\u96c6|\u671f|\u8bdd|\u56de)",
+    ]
+    numbers = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, name, re.IGNORECASE):
+            try:
+                num = int(match.group(1))
+            except ValueError:
+                continue
+            if 0 < num <= 300:
+                numbers.append(num)
+    return numbers
+
+
+def _get_latest_episode_from_list(file_list):
+    latest_episode = None
+    for item in file_list:
+        name = item.get("file_name", "")
+        for num in _find_episode_numbers(name):
+            latest_episode = num if latest_episode is None else max(latest_episode, num)
+    return latest_episode
+
+
+def _normalize_timestamp(ts):
+    try:
+        ts_val = int(ts)
+    except Exception:
+        return None
+    if ts_val < 100000000000:
+        ts_val *= 1000
+    return ts_val
+
+
+def _parse_start_time(task):
+    value = str(task.get("updated_after", "")).strip()
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        try:
+            dt = datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            return None
+    return int(dt.timestamp() * 1000)
+
+
+def _filter_by_start_time(file_list, start_ts):
+    if not start_ts:
+        return file_list
+    filtered = []
+    for item in file_list:
+        if item.get("dir"):
+            filtered.append(item)
+            continue
+        ts_val = _normalize_timestamp(item.get("updated_at"))
+        if ts_val is None or ts_val >= start_ts:
+            filtered.append(item)
+    return filtered
+
+
+def _filter_by_recent_episodes(file_list, latest_episode, recent_episodes):
+    if not latest_episode or recent_episodes <= 0:
+        return file_list
+    min_ep = max(1, latest_episode - recent_episodes + 1)
+    filtered = []
+    for item in file_list:
+        if item.get("dir"):
+            filtered.append(item)
+            continue
+        nums = _find_episode_numbers(item.get("file_name", ""))
+        if any(min_ep <= n <= latest_episode for n in nums):
+            filtered.append(item)
+    return filtered
+
+
+def _get_share_latest_episode(account, shareurl):
+    try:
+        pwd_id, passcode, pdir_fid, _ = account.extract_url(shareurl)
+        get_stoken = account.get_stoken(pwd_id, passcode)
+        if get_stoken.get("status") != 200:
+            return None
+        stoken = get_stoken["data"]["stoken"]
+        share_detail = account.get_detail(pwd_id, stoken, pdir_fid)
+        if share_detail.get("code") != 0:
+            return None
+        share_file_list = share_detail["data"].get("list", [])
+        if (
+            len(share_file_list) == 1
+            and share_file_list[0].get("dir")
+            and pdir_fid in ("", 0)
+        ):
+            share_file_list = account.get_detail(
+                pwd_id, stoken, share_file_list[0]["fid"]
+            )["data"].get("list", [])
+        return _get_latest_episode_from_list(share_file_list)
+    except Exception:
+        return None
+
+
+def _search_task_suggestions(query, source_config, deep=1):
+    results = []
+    net_data = source_config.get("net", {})
+    cs_data = source_config.get("cloudsaver", {})
+    ps_data = source_config.get("pansou", {})
+
+    if str(net_data.get("enable", "true")).lower() != "false":
+        try:
+            base_url = base64.b64decode("aHR0cHM6Ly9zLjkxNzc4OC54eXo=").decode()
+            response = requests.get(
+                f"{base_url}/task_suggestions",
+                params={"q": query, "d": deep},
+                timeout=15,
+            )
+            data = response.json()
+            if isinstance(data, list):
+                results.extend(data)
+            elif isinstance(data, dict):
+                results.extend(data.get("data", []))
+        except Exception:
+            pass
+
+    if (
+        CloudSaver
+        and cs_data.get("server")
+        and cs_data.get("username")
+        and cs_data.get("password")
+    ):
+        try:
+            cs = CloudSaver(cs_data.get("server"))
+            cs.set_auth(
+                cs_data.get("username", ""),
+                cs_data.get("password", ""),
+                cs_data.get("token", ""),
+            )
+            search = cs.auto_login_search(query)
+            if search.get("success"):
+                if search.get("new_token"):
+                    cs_data["token"] = search.get("new_token")
+                results.extend(cs.clean_search_results(search.get("data")))
+        except Exception:
+            pass
+
+    if PanSou and ps_data.get("server"):
+        try:
+            ps = PanSou(ps_data.get("server"))
+            results.extend(ps.search(query, deep == 1))
+        except Exception:
+            pass
+
+    results.sort(key=lambda x: x.get("datetime", ""), reverse=True)
+    deduped = []
+    link_array = []
+    for item in results:
+        url = item.get("shareurl", "")
+        if url and url not in link_array:
+            link_array.append(url)
+            deduped.append(item)
+    return deduped
+
+
+def resolve_smart_task(account, task):
+    taskname = task.get("taskname", "").strip()
+    if not taskname:
+        return None, "任务名称为空"
+    source_config = CONFIG_DATA.get("source", {})
+    candidates = _search_task_suggestions(taskname, source_config, deep=1)
+    if not candidates:
+        return None, "未搜索到相关分享"
+    for item in candidates:
+        shareurl = item.get("shareurl")
+        if not shareurl:
+            continue
+        latest_episode = _get_share_latest_episode(account, shareurl)
+        if latest_episode is None:
+            continue
+        resolved = copy.deepcopy(task)
+        resolved["shareurl"] = shareurl
+        resolved["smart_latest_episode"] = latest_episode
+        resolved["smart_source"] = item.get("source", "")
+        resolved["smart_channel"] = item.get("channel", "")
+        return resolved, None
+    return None, "未解析到有效剧集"
 
 
 class Config:
@@ -851,6 +1053,20 @@ class Quark:
             )["data"]["list"]
 
         # 获取目标目录文件列表
+        start_ts = _parse_start_time(task)
+        try:
+            recent_episodes = int(task.get("recent_episodes", 0) or 0)
+        except (TypeError, ValueError):
+            recent_episodes = 0
+        if recent_episodes > 0:
+            latest_episode = task.get("smart_latest_episode")
+            if not latest_episode:
+                latest_episode = _get_latest_episode_from_list(share_file_list)
+            share_file_list = _filter_by_recent_episodes(
+                share_file_list, latest_episode, recent_episodes
+            )
+        share_file_list = _filter_by_start_time(share_file_list, start_ts)
+
         savepath = re.sub(r"/{2,}", "/", f"/{task['savepath']}{subdir_path}")
         if not self.savepath_fid.get(savepath):
             if get_fids := self.get_fids([savepath]):
@@ -1102,14 +1318,26 @@ def do_sign(account):
     print()
 
 
-def do_save(account, tasklist=[]):
+def do_save(account, tasklist=None, smart_tasklist=None):
+    tasklist = tasklist or []
+    smart_tasklist = smart_tasklist or []
     print(f"🧩 载入插件")
     plugins, CONFIG_DATA["plugins"], task_plugins_config = Config.load_plugins(
         CONFIG_DATA.get("plugins", {})
     )
     print(f"转存账号: {account.nickname}")
     # 获取全部保存目录fid
-    account.update_savepath_fid(tasklist)
+    smart_tasklist_paths = []
+    for task in smart_tasklist:
+        if task.get("savepath") and "TASKNAME" in task.get("savepath", ""):
+            task_copy = copy.copy(task)
+            task_copy["savepath"] = task["savepath"].replace(
+                "TASKNAME", task.get("taskname", "")
+            )
+            smart_tasklist_paths.append(task_copy)
+        else:
+            smart_tasklist_paths.append(task)
+    account.update_savepath_fid(tasklist + smart_tasklist_paths)
 
     def is_time(task):
         return (
@@ -1173,6 +1401,70 @@ def do_save(account, tasklist=[]):
                         task = (
                             plugin.run(task, account=account, tree=is_new_tree) or task
                         )
+    # Smart tasks
+    for index, task in enumerate(smart_tasklist):
+        print()
+        print(f"#S{index+1}------------------")
+        print(f"Task name: {task.get('taskname', '')}")
+        print(f"Save path: {task.get('savepath', '')}")
+        if task.get("pattern"):
+            print(f"Pattern: {task.get('pattern')}")
+        if task.get("replace"):
+            print(f"Replace: {task.get('replace')}")
+        if task.get("update_subdir"):
+            print(f"Update subdir: {task.get('update_subdir')}")
+        if task.get("runweek") or task.get("enddate"):
+            print(
+                f"Schedule: WK{task.get('runweek',[])} ~ {task.get('enddate','forever')}"
+            )
+        print()
+        if not is_time(task):
+            print("Outside schedule, skip")
+            continue
+
+        resolved_task, err = resolve_smart_task(account, task)
+        if not resolved_task:
+            print(f"Auto search failed: {err}")
+            add_notify(f"Auto search failed: {task.get('taskname','')}: {err}\n")
+            continue
+        if resolved_task.get("savepath") and "TASKNAME" in resolved_task.get("savepath", ""):
+            resolved_task["savepath"] = resolved_task["savepath"].replace(
+                "TASKNAME", resolved_task.get("taskname", "")
+            )
+
+        if resolved_task.get("smart_latest_episode") is not None:
+            print(
+                f"Auto search: {resolved_task.get('smart_source','')} {resolved_task.get('smart_channel','')} E{resolved_task.get('smart_latest_episode')}"
+            )
+        print(f"Share URL: {resolved_task.get('shareurl', '')}")
+
+        is_new_tree = account.do_save_task(resolved_task)
+
+        def merge_dicts(a, b):
+            result = a.copy()
+            for key, value in b.items():
+                if (
+                    key in result
+                    and isinstance(result[key], dict)
+                    and isinstance(value, dict)
+                ):
+                    result[key] = merge_dicts(result[key], value)
+                elif key not in result:
+                    result[key] = value
+            return result
+
+        resolved_task["addition"] = merge_dicts(
+            resolved_task.get("addition", {}), task_plugins_config
+        )
+        if is_new_tree:
+            print("Run plugins")
+            for plugin_name, plugin in plugins.items():
+                if plugin.is_active:
+                    resolved_task = (
+                        plugin.run(resolved_task, account=account, tree=is_new_tree)
+                        or resolved_task
+                    )
+
     print()
 
 
@@ -1201,6 +1493,12 @@ def main():
         return
     # 从环境变量中获取 TASKLIST
     tasklist_from_env = []
+    smart_tasklist_from_env = []
+    if smart_tasklist_json := os.environ.get("SMART_TASKLIST"):
+        try:
+            smart_tasklist_from_env = json.loads(smart_tasklist_json)
+        except Exception as e:
+            print(f"SMART_TASKLIST parse failed: {e}")
     if tasklist_json := os.environ.get("TASKLIST"):
         try:
             tasklist_from_env = json.loads(tasklist_json)
@@ -1224,6 +1522,8 @@ def main():
         print(f"⚙️ 正从 {config_path} 文件中读取配置")
         CONFIG_DATA = Config.read_json(config_path)
         Config.breaking_change_update(CONFIG_DATA)
+        if not CONFIG_DATA.get("smart_tasklist"):
+            CONFIG_DATA["smart_tasklist"] = []
         cookie_val = CONFIG_DATA.get("cookie")
         cookie_form_file = True
     # 获取cookie
@@ -1234,7 +1534,7 @@ def main():
     accounts = [Quark(cookie, index) for index, cookie in enumerate(cookies)]
     # 签到
     print(f"===============签到任务===============")
-    if tasklist_from_env:
+    if tasklist_from_env or smart_tasklist_from_env:
         verify_account(accounts[0])
     else:
         for account in accounts:
@@ -1245,10 +1545,14 @@ def main():
     if accounts[0].is_active and cookie_form_file:
         print(f"===============转存任务===============")
         # 任务列表
-        if tasklist_from_env:
-            do_save(accounts[0], tasklist_from_env)
+        if tasklist_from_env or smart_tasklist_from_env:
+            do_save(accounts[0], tasklist_from_env, smart_tasklist_from_env)
         else:
-            do_save(accounts[0], CONFIG_DATA.get("tasklist", []))
+            do_save(
+                accounts[0],
+                CONFIG_DATA.get("tasklist", []),
+                CONFIG_DATA.get("smart_tasklist", []),
+            )
         print()
     # 通知
     if NOTIFYS:

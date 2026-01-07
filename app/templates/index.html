@@ -418,6 +418,18 @@
                     </div>
                   </div>
                   <div class="form-group row">
+                    <label class="col-sm-2 col-form-label">Update after</label>
+                    <div class="col-sm-10">
+                      <input type="datetime-local" class="form-control" v-model="task.updated_after" placeholder="Optional">
+                    </div>
+                  </div>
+                  <div class="form-group row">
+                    <label class="col-sm-2 col-form-label">Recent episodes</label>
+                    <div class="col-sm-10">
+                      <input type="number" min="0" class="form-control" v-model.number="task.recent_episodes" placeholder="0 means no limit">
+                    </div>
+                  </div>
+                  <div class="form-group row">
                     <label class="col-sm-2 col-form-label">截止日期</label>
                     <div class="col-sm-10">
                       <input type="date" name="enddate[]" class="form-control" v-model="task.enddate" placeholder="可选">
@@ -450,6 +462,111 @@
                 <div class="btn-group" role="group" aria-label="任务操作">
                   <button type="button" class="btn btn-primary" @click="addTask()"><i class="bi bi-plus"></i> 增加任务</button>
                   <button type="button" class="btn btn-primary" @click="addTaskForClipboard()" title="从粘贴板导入"><i class="bi bi-clipboard-plus"></i></button>
+                </div>
+              </div>
+            </div>
+            <div class="row title mt-5">
+              <div class="col">
+                <h2>Smart Task List</h2>
+              </div>
+            </div>
+            <p class="text-muted small">Only enter the show name. The program will use deep search and pick the first share link that can parse episodes.</p>
+            <div v-for="(task, index) in formData.smart_tasklist" :key="`smart-${index}`" class="task mb-3">
+              <hr>
+              <div class="form-group row" style="align-items:center">
+                <div class="col pl-0" data-toggle="collapse" :data-target="`#collapse_smart_${index}`" aria-expanded="true" :aria-controls="`collapse_smart_${index}`">
+                  <div class="btn btn-block text-left">
+                    <i class="bi bi-caret-right-fill"></i> #S<span v-html="`${index+1}: ${task.taskname}`"></span>
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <button type="button" class="btn btn-outline-primary btn-sm" @click="runSmartTaskNow(index)" title="Run smart task"><i class="bi bi-play-fill"></i></button>
+                  <button type="button" class="btn btn-outline-danger btn-sm" @click="removeSmartTask(index)" title="Delete smart task"><i class="bi bi-trash3-fill"></i></button>
+                </div>
+              </div>
+              <div class="collapse ml-3" :id="`collapse_smart_${index}`">
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Task name</label>
+                  <div class="col-sm-10">
+                    <input type="text" class="form-control" v-model="task.taskname" placeholder="Required">
+                  </div>
+                </div>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Save path</label>
+                  <div class="col-sm-10">
+                    <input type="text" class="form-control" v-model="task.savepath" placeholder="Required">
+                  </div>
+                </div>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Save rules</label>
+                  <div class="col-sm-10">
+                    <div class="input-group">
+                      <input type="text" class="form-control" v-model="task.pattern" placeholder="Pattern" list="magicRegex">
+                      <input type="text" class="form-control" v-model="task.replace" placeholder="Replace">
+                      <div class="input-group-append" title="Ignore extension when comparing file name">
+                        <div class="input-group-text">
+                          <input type="checkbox" v-model="task.ignore_extension">&nbsp;Ignore ext
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Update subdir</label>
+                  <div class="col-sm-10">
+                    <div class="input-group">
+                      <input type="text" class="form-control" v-model="task.update_subdir" placeholder="Optional">
+                      <div class="input-group-append" title="Resave mode">
+                        <div class="input-group-text">
+                          <input type="checkbox" v-model="task.update_subdir_resave_mode">&nbsp;Resave
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Update after</label>
+                  <div class="col-sm-10">
+                    <input type="datetime-local" class="form-control" v-model="task.updated_after" placeholder="Optional">
+                  </div>
+                </div>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Recent episodes</label>
+                  <div class="col-sm-10">
+                    <input type="number" min="0" class="form-control" v-model.number="task.recent_episodes" placeholder="0 means no limit">
+                  </div>
+                </div>
+<div class="form-group row">
+                  <label class="col-sm-2 col-form-label">End date</label>
+                  <div class="col-sm-10">
+                    <input type="date" class="form-control" v-model="task.enddate" placeholder="Optional">
+                  </div>
+                </div>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Run week</label>
+                  <div class="col-sm-10 col-form-label">
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="checkbox" :checked="task.runweek.length === 7" @change="toggleAllWeekdays(task)" :indeterminate.prop="task.runweek.length > 0 && task.runweek.length < 7">
+                      <label class="form-check-label">All</label>
+                    </div>
+                    <div class="form-check form-check-inline" v-for="(day, index) in weekdays" :key="`smart-week-${index}`">
+                      <input class="form-check-input" type="checkbox" v-model="task.runweek" :value="index+1">
+                      <label class="form-check-label" v-html="day"></label>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group row" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length">
+                  <label class="col-sm-2 col-form-label">Plugin options</label>
+                  <div class="col-sm-10">
+                    <v-jsoneditor v-model="task.addition" :options="{mode:'tree'}" :plus="false" height="180px"></v-jsoneditor>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="row mt-3">
+              <div class="col-sm-12 text-center">
+                <div class="btn-group" role="group" aria-label="smart-task-actions">
+                  <button type="button" class="btn btn-primary" @click="addSmartTask()"><i class="bi bi-plus"></i> Add smart task</button>
                 </div>
               </div>
             </div>
@@ -625,6 +742,7 @@
           push_config: {},
           media_servers: {},
           tasklist: [],
+          smart_tasklist: [],
           magic_regex: {},
           source: {
             net: {
@@ -651,6 +769,22 @@
           enddate: "",
           addition: {},
           ignore_extension: false,
+          updated_after: "",
+          recent_episodes: 0,
+          runweek: [1, 2, 3, 4, 5, 6, 7]
+        },
+        newSmartTask: {
+          taskname: "",
+          savepath: "/",
+          pattern: "",
+          replace: "",
+          enddate: "",
+          addition: {},
+          ignore_extension: false,
+          updated_after: "",
+          recent_episodes: 0,
+          update_subdir: "",
+          update_subdir_resave_mode: false,
           runweek: [1, 2, 3, 4, 5, 6, 7]
         },
         run_log: "",
@@ -754,6 +888,30 @@
                 if (!task.hasOwnProperty('runweek')) {
                   task.runweek = [1, 2, 3, 4, 5, 6, 7];
                 }
+                if (!task.hasOwnProperty('updated_after')) {
+                  task.updated_after = "";
+                }
+                if (!task.hasOwnProperty('recent_episodes')) {
+                  task.recent_episodes = 0;
+                }
+                return task;
+              });
+              if (!config_data.smart_tasklist) {
+                config_data.smart_tasklist = [];
+              }
+              config_data.smart_tasklist = config_data.smart_tasklist.map(task => {
+                if (!task.hasOwnProperty('runweek')) {
+                  task.runweek = [1, 2, 3, 4, 5, 6, 7];
+                }
+                if (!task.hasOwnProperty('update_subdir_resave_mode')) {
+                  task.update_subdir_resave_mode = false;
+                }
+                if (!task.hasOwnProperty('updated_after')) {
+                  task.updated_after = "";
+                }
+                if (!task.hasOwnProperty('recent_episodes')) {
+                  task.recent_episodes = 0;
+                }
                 return task;
               });
               // 获取所有任务父目录
@@ -763,6 +921,7 @@
                   this.taskDirs.push(parentDir);
               });
               this.newTask.addition = config_data.task_plugins_config_default;
+              this.newSmartTask.addition = config_data.task_plugins_config_default;
               // 确保source配置存在
               if (!config_data.source) {
                 config_data.source = {};
@@ -869,6 +1028,32 @@
             });
           }, 1);
         },
+        addSmartTask() {
+          newTask = { ...this.newSmartTask };
+          newTask.taskname = this.taskNameFilter;
+          if (this.formData.smart_tasklist.length > 0) {
+            lastTask = this.formData.smart_tasklist[this.formData.smart_tasklist.length - 1];
+            if (newTask.taskname) {
+              newTask.savepath = lastTask.savepath.replace(lastTask.taskname, newTask.taskname);
+            } else {
+              newTask.savepath = lastTask.taskname ? lastTask.savepath.replace(lastTask.taskname, 'TASKNAME') : lastTask.savepath;
+            }
+          }
+          this.formData.smart_tasklist.push(newTask);
+        },
+        removeSmartTask(index) {
+          if (confirm("Confirm delete smart task [#" + (index + 1) + ": " + this.formData.smart_tasklist[index].taskname + "]?"))
+            this.formData.smart_tasklist.splice(index, 1);
+        },
+        async runSmartTaskNow(index) {
+          task = { ...this.formData.smart_tasklist[index] };
+          delete task.runweek;
+          delete task.enddate;
+          body = {
+            "smart_tasklist": [task]
+          };
+          this.runScriptWithBody(body, false);
+        },
         focusTaskname(index, task) {
           this.smart_param.index = index
           this.smart_param.origin_savepath = task.savepath
@@ -952,15 +1137,18 @@
               "tasklist": [task]
             };
           } else if (this.configModified) {
-            if (!confirm('配置已修改但未保存，是否继续运行？')) {
+            if (!confirm('?????????????????')) {
               return;
             }
           }
+          return this.runScriptWithBody(body, task_index == null);
+        },
+        async runScriptWithBody(body, refreshAfter = false) {
           $('#logModal').modal('toggle');
           this.modalLoading = true;
           this.run_log = '';
           try {
-            // 1. 发送 POST 请求
+            // 1. send POST request
             const response = await fetch(`/run_script_now`, {
               method: 'POST',
               headers: {
@@ -971,7 +1159,7 @@
             if (!response.ok) {
               throw new Error(`HTTP error! Status: ${response.status}`);
             }
-            // 2. 处理 SSE 流
+            // 2. handle SSE stream
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let partialData = '';
@@ -987,13 +1175,12 @@
                   const eventData = line.substring(5).trim();
                   if (eventData === '[DONE]') {
                     this.modalLoading = false;
-                    if (task_index == null) {
+                    if (refreshAfter) {
                       this.fetchData();
                     }
                     break;
                   }
-                  this.run_log += eventData.replace('<', '<\u200B') + '\n';
-                  // 在更新 run_log 后将滚动条滚动到底部
+                  this.run_log += eventData.replace('<', '<​') + '\n';
                   this.$nextTick(() => {
                     const modalBody = document.querySelector('.modal-body');
                     modalBody.scrollTop = modalBody.scrollHeight;
