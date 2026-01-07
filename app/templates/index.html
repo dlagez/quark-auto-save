@@ -264,6 +264,30 @@
                 </div>
               </div>
             </div>
+            <div class="row title" title="smart search settings">
+              <div class="col-10">
+                <h2 style="display: inline-block;"><i class="bi bi-sliders"></i> Smart Search</h2>
+              </div>
+            </div>
+            <div class="form-group row">
+              <label class="col-sm-2 col-form-label">Top N</label>
+              <div class="col-sm-10">
+                <input type="number" min="1" class="form-control" v-model.number="formData.smart_search_limit" placeholder="Default 20">
+              </div>
+            </div>
+            <div class="form-group row">
+              <label class="col-sm-2 col-form-label">Workers</label>
+              <div class="col-sm-10">
+                <input type="number" min="1" max="4" class="form-control" v-model.number="formData.smart_search_workers" placeholder="Default 2">
+              </div>
+            </div>
+            <div class="form-group row">
+              <label class="col-sm-2 col-form-label">Timeout (s)</label>
+              <div class="col-sm-10">
+                <input type="number" min="1" class="form-control" v-model.number="formData.smart_search_timeout" placeholder="Default 12">
+              </div>
+            </div>
+
 
           </div>
 
@@ -763,6 +787,9 @@
               server: ""
             }
           },
+          smart_search_limit: 20,
+          smart_search_workers: 2,
+          smart_search_timeout: 12,
         },
         toasts: [],
         newTask: {
@@ -949,6 +976,15 @@
                 config_data.source.net = {
                   enable: ""
                 };
+              }
+              if (!config_data.smart_search_limit) {
+                config_data.smart_search_limit = 20;
+              }
+              if (!config_data.smart_search_workers) {
+                config_data.smart_search_workers = 2;
+              }
+              if (!config_data.smart_search_timeout) {
+                config_data.smart_search_timeout = 12;
               }
               this.formData = config_data;
               setTimeout(() => {

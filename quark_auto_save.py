@@ -19,6 +19,7 @@ import traceback
 import urllib.parse
 import base64
 import copy
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from natsort import natsorted
 
@@ -151,14 +152,16 @@ def _filter_by_recent_episodes(file_list, latest_episode, recent_episodes):
     return filtered
 
 
-def _get_share_latest_episode(account, shareurl):
+def _get_share_latest_episode(account, shareurl, timeout=None):
     try:
         pwd_id, passcode, pdir_fid, _ = account.extract_url(shareurl)
-        get_stoken = account.get_stoken(pwd_id, passcode)
+        get_stoken = account.get_stoken(pwd_id, passcode, timeout=timeout)
         if get_stoken.get("status") != 200:
             return None
         stoken = get_stoken["data"]["stoken"]
-        share_detail = account.get_detail(pwd_id, stoken, pdir_fid)
+        share_detail = account.get_detail(
+            pwd_id, stoken, pdir_fid, timeout=timeout
+        )
         if share_detail.get("code") != 0:
             return None
         share_file_list = share_detail["data"].get("list", [])
@@ -168,7 +171,7 @@ def _get_share_latest_episode(account, shareurl):
             and pdir_fid in ("", 0)
         ):
             share_file_list = account.get_detail(
-                pwd_id, stoken, share_file_list[0]["fid"]
+                pwd_id, stoken, share_file_list[0]["fid"], timeout=timeout
             )["data"].get("list", [])
         return _get_latest_episode_from_list(share_file_list)
     except Exception:
@@ -244,18 +247,48 @@ def resolve_smart_task(account, task):
     candidates = _search_task_suggestions(taskname, source_config, deep=1)
     if not candidates:
         return None, "未搜索到相关分享"
+    limit = CONFIG_DATA.get("smart_search_limit", 20)
+    workers = CONFIG_DATA.get("smart_search_workers", 2)
+    timeout = CONFIG_DATA.get("smart_search_timeout", 12)
+    try:
+        limit = int(os.environ.get("SMART_SEARCH_LIMIT", limit))
+    except (TypeError, ValueError):
+        limit = 20
+    try:
+        workers = int(os.environ.get("SMART_SEARCH_WORKERS", workers))
+    except (TypeError, ValueError):
+        workers = 2
+    try:
+        timeout = float(os.environ.get("SMART_SEARCH_TIMEOUT", timeout))
+    except (TypeError, ValueError):
+        timeout = 12
+    limit = max(1, limit)
+    workers = min(4, max(1, workers))
+
     best_item = None
     best_episode = None
-    for item in candidates[:20]:
-        shareurl = item.get("shareurl")
-        if not shareurl:
-            continue
-        latest_episode = _get_share_latest_episode(account, shareurl)
-        if latest_episode is None:
-            continue
-        if best_episode is None or latest_episode > best_episode:
-            best_episode = latest_episode
-            best_item = item
+    candidates = candidates[:limit]
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_item = {}
+        for item in candidates:
+            shareurl = item.get("shareurl")
+            if not shareurl:
+                continue
+            future = executor.submit(
+                _get_share_latest_episode, account, shareurl, timeout
+            )
+            future_to_item[future] = item
+        for future in as_completed(future_to_item):
+            try:
+                latest_episode = future.result()
+            except Exception:
+                continue
+            if latest_episode is None:
+                continue
+            item = future_to_item[future]
+            if best_episode is None or latest_episode > best_episode:
+                best_episode = latest_episode
+                best_item = item
     if best_item is None:
         return None, "未解析到有效剧集"
     resolved = copy.deepcopy(task)
@@ -695,17 +728,23 @@ class Quark:
             return False, response["message"]
 
     # 可验证资源是否失效
-    def get_stoken(self, pwd_id, passcode=""):
+    def get_stoken(self, pwd_id, passcode="", timeout=None):
         url = f"{self.BASE_URL}/1/clouddrive/share/sharepage/token"
         querystring = {"pr": "ucpro", "fr": "pc"}
         payload = {"pwd_id": pwd_id, "passcode": passcode}
         response = self._send_request(
-            "POST", url, json=payload, params=querystring
+            "POST", url, json=payload, params=querystring, timeout=timeout
         ).json()
         return response
 
     def get_detail(
-        self, pwd_id, stoken, pdir_fid, _fetch_share=0, fetch_share_full_path=0
+        self,
+        pwd_id,
+        stoken,
+        pdir_fid,
+        _fetch_share=0,
+        fetch_share_full_path=0,
+        timeout=None,
     ):
         list_merge = []
         page = 1
@@ -727,7 +766,9 @@ class Quark:
                 "ver": "2",
                 "fetch_share_full_path": fetch_share_full_path,
             }
-            response = self._send_request("GET", url, params=querystring).json()
+            response = self._send_request(
+                "GET", url, params=querystring, timeout=timeout
+            ).json()
             if response["code"] != 0:
                 return response
             if response["data"]["list"]:

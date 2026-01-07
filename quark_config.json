@@ -12,6 +12,9 @@
       "token": ""
     }
   },
+  "smart_search_limit": 20,
+  "smart_search_workers": 2,
+  "smart_search_timeout": 12,
   "magic_regex": {
     "$TV_REGEX": {
       "pattern": ".*?([Ss]\\d{1,2})?(?:[第EePpXx\\.\\-\\_\\( ]{1,2}|^)(\\d{1,3})(?!\\d).*?\\.(mp4|mkv)",
