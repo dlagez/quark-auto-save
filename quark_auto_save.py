@@ -77,6 +77,7 @@ def _find_episode_numbers(name):
         r"[Ss]\d{1,2}[Ee](\d{1,3})",
         r"\bEP?\s*(\d{1,3})\b",
         r"\u7b2c\s*(\d{1,3})\s*(\u96c6|\u671f|\u8bdd|\u56de)",
+        r"^\s*(\d{1,3})(?=\s*[_\.-]?\s*(4k|2160p|1080p|720p|web|webrip|hdtv|bluray|bdrip|x264|x265)|\s*\.(mp4|mkv|mov|m4v|avi|ts))",
     ]
     numbers = []
     for pattern in patterns:
@@ -178,6 +179,41 @@ def _get_share_latest_episode(account, shareurl, timeout=None):
         return None
 
 
+def _get_share_recent_info(account, shareurl, recent_episodes, timeout=None):
+    try:
+        pwd_id, passcode, pdir_fid, _ = account.extract_url(shareurl)
+        get_stoken = account.get_stoken(pwd_id, passcode, timeout=timeout)
+        if get_stoken.get("status") != 200:
+            return None, []
+        stoken = get_stoken["data"]["stoken"]
+        share_detail = account.get_detail(
+            pwd_id, stoken, pdir_fid, timeout=timeout
+        )
+        if share_detail.get("code") != 0:
+            return None, []
+        share_file_list = share_detail["data"].get("list", [])
+        if (
+            len(share_file_list) == 1
+            and share_file_list[0].get("dir")
+            and pdir_fid in ("", 0)
+        ):
+            share_file_list = account.get_detail(
+                pwd_id, stoken, share_file_list[0]["fid"], timeout=timeout
+            )["data"].get("list", [])
+        latest_episode = _get_latest_episode_from_list(share_file_list)
+        recent_files = []
+        if recent_episodes and latest_episode:
+            filtered = _filter_by_recent_episodes(
+                share_file_list, latest_episode, recent_episodes
+            )
+            for item in filtered:
+                if not item.get("dir"):
+                    recent_files.append(item.get("file_name", ""))
+        return latest_episode, recent_files
+    except Exception:
+        return None, []
+
+
 def _search_task_suggestions(query, source_config, deep=1):
     results = []
     net_data = source_config.get("net", {})
@@ -243,6 +279,14 @@ def resolve_smart_task(account, task):
     taskname = task.get("taskname", "").strip()
     if not taskname:
         return None, "任务名称为空"
+    if task.get("manual_shareurl"):
+        resolved = copy.deepcopy(task)
+        resolved["shareurl"] = task.get("manual_shareurl", "")
+        resolved["smart_latest_episode"] = task.get("manual_latest_episode")
+        resolved["smart_source"] = task.get("manual_source", "")
+        resolved["smart_channel"] = task.get("manual_channel", "")
+        resolved["save_whole_folder"] = bool(resolved.get("save_whole_folder"))
+        return resolved, None
     source_config = CONFIG_DATA.get("source", {})
     candidates = _search_task_suggestions(taskname, source_config, deep=1)
     if not candidates:
@@ -310,6 +354,75 @@ def resolve_smart_task(account, task):
     resolved["smart_candidates"] = candidate_results
     resolved["save_whole_folder"] = bool(resolved.get("save_whole_folder"))
     return resolved, None
+
+
+def get_smart_candidates(account, task):
+    taskname = task.get("taskname", "").strip()
+    if not taskname:
+        return {"taskname": taskname, "error": "任务名称为空", "candidates": []}
+    source_config = CONFIG_DATA.get("source", {})
+    candidates = _search_task_suggestions(taskname, source_config, deep=1)
+    if not candidates:
+        return {"taskname": taskname, "error": "未搜索到相关分享", "candidates": []}
+    limit = CONFIG_DATA.get("smart_search_limit", 20)
+    workers = CONFIG_DATA.get("smart_search_workers", 2)
+    timeout = CONFIG_DATA.get("smart_search_timeout", 12)
+    try:
+        limit = int(os.environ.get("SMART_SEARCH_LIMIT", limit))
+    except (TypeError, ValueError):
+        limit = 20
+    try:
+        workers = int(os.environ.get("SMART_SEARCH_WORKERS", workers))
+    except (TypeError, ValueError):
+        workers = 2
+    try:
+        timeout = float(os.environ.get("SMART_SEARCH_TIMEOUT", timeout))
+    except (TypeError, ValueError):
+        timeout = 12
+    limit = max(1, limit)
+    workers = min(4, max(1, workers))
+    try:
+        recent_episodes = int(task.get("recent_episodes", 0) or 0)
+    except (TypeError, ValueError):
+        recent_episodes = 0
+
+    candidates = candidates[:limit]
+    candidate_results = []
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_index = {}
+        for idx, item in enumerate(candidates):
+            shareurl = item.get("shareurl")
+            candidate_results.append(
+                {
+                    "shareurl": shareurl or "",
+                    "source": item.get("source", ""),
+                    "channel": item.get("channel", ""),
+                    "datetime": item.get("datetime", ""),
+                    "latest_episode": None,
+                    "recent_files": [],
+                }
+            )
+            if not shareurl:
+                continue
+            future = executor.submit(
+                _get_share_recent_info,
+                account,
+                shareurl,
+                recent_episodes,
+                timeout,
+            )
+            future_to_index[future] = idx
+        for future in as_completed(future_to_index):
+            try:
+                latest_episode, recent_files = future.result()
+            except Exception:
+                latest_episode = None
+                recent_files = []
+            idx = future_to_index[future]
+            candidate_results[idx]["latest_episode"] = latest_episode
+            candidate_results[idx]["recent_files"] = recent_files
+
+    return {"taskname": taskname, "candidates": candidate_results}
 
 
 class Config:
@@ -1520,6 +1633,10 @@ def do_save(account, tasklist=None, smart_tasklist=None):
             )
         print(f"Share URL: {resolved_task.get('shareurl', '')}")
 
+        if str(os.environ.get("SMART_TEST_ONLY", "")).lower() == "true":
+            print("Test mode: search only, skip save")
+            continue
+
         is_new_tree = account.do_save_task(resolved_task)
 
         def merge_dicts(a, b):
@@ -1614,6 +1731,16 @@ def main():
         print("❌ cookie 未配置")
         return
     accounts = [Quark(cookie, index) for index, cookie in enumerate(cookies)]
+    if str(os.environ.get("SMART_CANDIDATES_ONLY", "")).lower() == "true":
+        results = []
+        if smart_tasklist_from_env:
+            tasklist = smart_tasklist_from_env
+        else:
+            tasklist = CONFIG_DATA.get("smart_tasklist", [])
+        for task in tasklist:
+            results.append(get_smart_candidates(accounts[0], task))
+        print("__SMART_CANDIDATES__" + json.dumps(results, ensure_ascii=False))
+        return
     # 签到
     print(f"===============签到任务===============")
     if tasklist_from_env or smart_tasklist_from_env:

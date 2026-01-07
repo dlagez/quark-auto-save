@@ -505,6 +505,7 @@
                 </div>
                 <div class="col-auto">
                   <button type="button" class="btn btn-outline-primary btn-sm" @click="runSmartTaskNow(index)" title="Run smart task"><i class="bi bi-play-fill"></i></button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="openSmartCandidates(index)" title="Test search"><i class="bi bi-search"></i></button>
                   <button type="button" class="btn btn-outline-danger btn-sm" @click="removeSmartTask(index)" title="Delete smart task"><i class="bi bi-trash3-fill"></i></button>
                 </div>
               </div>
@@ -717,6 +718,57 @@
       </div>
     </div>
 
+    <!-- Smart candidates -->
+    <div class="modal" tabindex="-1" id="smartCandidatesModal">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><b>Smart candidates</b>
+              <div v-if="smartCandidates.loading" class="spinner-border spinner-border-sm m-1" role="status"></div>
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body small">
+            <div v-if="smartCandidates.error" class="alert alert-warning" v-html="smartCandidates.error"></div>
+            <div v-else>
+              <div class="mb-2"><b>Task:</b> <span>{{ smartCandidates.taskname }}</span></div>
+              <table class="table table-hover table-sm">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Latest</th>
+                    <th scope="col">Recent episodes</th>
+                    <th scope="col">Share URL</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, idx) in smartCandidates.items" :key="`cand-${idx}`">
+                    <td>{{ idx + 1 }}</td>
+                    <td>
+                      <span v-if="item.source">{{ item.source }}</span>
+                      <span v-if="item.channel"> / {{ item.channel }}</span>
+                    </td>
+                    <td>{{ item.latest_episode != null ? ('E' + item.latest_episode) : 'E?' }}</td>
+                    <td :title="recentFilesTitle(item)">{{ formatRecentFiles(item) }}</td>
+                    <td>
+                      <a :href="item.shareurl" target="_blank" @click.stop>{{ item.shareurl }}</a>
+                    </td>
+                    <td>
+                      <button type="button" class="btn btn-outline-primary btn-sm" :disabled="!item.shareurl" @click="saveSmartCandidate(item)">Save</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <div class="toast-container">
       <div v-for="toast in toasts" :key="toast.id" class="toast show shadow-sm" :class="toast.type" role="alert" aria-live="assertive" aria-atomic="true">
@@ -824,6 +876,13 @@
           sortBy: "updated_at",
           sortOrder: "desc",
           isSmart: false
+        },
+        smartCandidates: {
+          index: null,
+          taskname: "",
+          items: [],
+          loading: false,
+          error: ""
         },
       },
       filters: {
@@ -1074,6 +1133,75 @@
           };
           this.runScriptWithBody(body, false);
         },
+        async openSmartCandidates(index) {
+          this.smartCandidates.index = index;
+          this.smartCandidates.taskname = this.formData.smart_tasklist[index].taskname || "";
+          this.smartCandidates.items = [];
+          this.smartCandidates.error = "";
+          this.smartCandidates.loading = true;
+          $('#smartCandidatesModal').modal('toggle');
+          task = { ...this.formData.smart_tasklist[index] };
+          delete task.runweek;
+          delete task.enddate;
+          body = {
+            "smart_tasklist": [task]
+          };
+          try {
+            const response = await fetch('/smart_candidates', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(body)
+            });
+            const result = await response.json();
+            if (!result.success) {
+              this.smartCandidates.error = result.message || 'Failed to load candidates';
+            } else if (Array.isArray(result.data) && result.data.length > 0) {
+              const first = result.data[0];
+              this.smartCandidates.taskname = first.taskname || this.smartCandidates.taskname;
+              this.smartCandidates.items = first.candidates || [];
+            }
+          } catch (error) {
+            this.smartCandidates.error = String(error || 'Failed to load candidates');
+          } finally {
+            this.smartCandidates.loading = false;
+          }
+        },
+        formatRecentFiles(item) {
+          if (!item || !Array.isArray(item.recent_files) || item.recent_files.length === 0) {
+            return '-';
+          }
+          const shown = item.recent_files.slice(0, 3).join(' / ');
+          if (item.recent_files.length > 3) {
+            return `${shown} ... (${item.recent_files.length})`;
+          }
+          return shown;
+        },
+        recentFilesTitle(item) {
+          if (!item || !Array.isArray(item.recent_files) || item.recent_files.length === 0) {
+            return '';
+          }
+          return item.recent_files.join('\n');
+        },
+        async saveSmartCandidate(item) {
+          if (this.smartCandidates.index == null) {
+            return;
+          }
+          task = { ...this.formData.smart_tasklist[this.smartCandidates.index] };
+          delete task.runweek;
+          delete task.enddate;
+          task.manual_shareurl = item.shareurl;
+          task.manual_source = item.source || "";
+          task.manual_channel = item.channel || "";
+          task.manual_latest_episode = item.latest_episode;
+          task.save_whole_folder = false;
+          body = {
+            "smart_tasklist": [task]
+          };
+          $('#smartCandidatesModal').modal('toggle');
+          this.runScriptWithBody(body, false);
+        },
         focusTaskname(index, task) {
           this.smart_param.index = index
           this.smart_param.origin_savepath = task.savepath
@@ -1163,13 +1291,13 @@
           }
           return this.runScriptWithBody(body, task_index == null);
         },
-        async runScriptWithBody(body, refreshAfter = false) {
+        async runScriptWithBody(body, refreshAfter = false, url = '/run_script_now') {
           $('#logModal').modal('toggle');
           this.modalLoading = true;
           this.run_log = '';
           try {
             // 1. send POST request
-            const response = await fetch(`/run_script_now`, {
+            const response = await fetch(url, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
