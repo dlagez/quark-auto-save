@@ -268,27 +268,38 @@ def resolve_smart_task(account, task):
     best_item = None
     best_episode = None
     candidates = candidates[:limit]
+    candidate_results = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_item = {}
-        for item in candidates:
+        future_to_index = {}
+        for idx, item in enumerate(candidates):
             shareurl = item.get("shareurl")
+            candidate_results.append(
+                {
+                    "shareurl": shareurl or "",
+                    "source": item.get("source", ""),
+                    "channel": item.get("channel", ""),
+                    "datetime": item.get("datetime", ""),
+                    "latest_episode": None,
+                }
+            )
             if not shareurl:
                 continue
             future = executor.submit(
                 _get_share_latest_episode, account, shareurl, timeout
             )
-            future_to_item[future] = item
-        for future in as_completed(future_to_item):
+            future_to_index[future] = idx
+        for future in as_completed(future_to_index):
             try:
                 latest_episode = future.result()
             except Exception:
-                continue
-            if latest_episode is None:
-                continue
-            item = future_to_item[future]
-            if best_episode is None or latest_episode > best_episode:
-                best_episode = latest_episode
-                best_item = item
+                latest_episode = None
+            idx = future_to_index[future]
+            candidate_results[idx]["latest_episode"] = latest_episode
+            if latest_episode is not None:
+                item = candidates[idx]
+                if best_episode is None or latest_episode > best_episode:
+                    best_episode = latest_episode
+                    best_item = item
     if best_item is None:
         return None, "未解析到有效剧集"
     resolved = copy.deepcopy(task)
@@ -296,6 +307,8 @@ def resolve_smart_task(account, task):
     resolved["smart_latest_episode"] = best_episode
     resolved["smart_source"] = best_item.get("source", "")
     resolved["smart_channel"] = best_item.get("channel", "")
+    resolved["smart_candidates"] = candidate_results
+    resolved["save_whole_folder"] = bool(resolved.get("save_whole_folder"))
     return resolved, None
 
 
@@ -1101,6 +1114,9 @@ class Quark:
 
         # 获取目标目录文件列表
         start_ts = _parse_start_time(task)
+        save_whole_folder = task.get("save_whole_folder")
+        if save_whole_folder is None:
+            save_whole_folder = True
         try:
             recent_episodes = int(task.get("recent_episodes", 0) or 0)
         except (TypeError, ValueError):
@@ -1109,10 +1125,12 @@ class Quark:
             latest_episode = task.get("smart_latest_episode")
             if not latest_episode:
                 latest_episode = _get_latest_episode_from_list(share_file_list)
-            share_file_list = _filter_by_recent_episodes(
-                share_file_list, latest_episode, recent_episodes
-            )
+        share_file_list = _filter_by_recent_episodes(
+            share_file_list, latest_episode, recent_episodes
+        )
         share_file_list = _filter_by_start_time(share_file_list, start_ts)
+        if not save_whole_folder:
+            share_file_list = [item for item in share_file_list if not item.get("dir")]
 
         savepath = re.sub(r"/{2,}", "/", f"/{task['savepath']}{subdir_path}")
         if not self.savepath_fid.get(savepath):
@@ -1478,6 +1496,23 @@ def do_save(account, tasklist=None, smart_tasklist=None):
             resolved_task["savepath"] = resolved_task["savepath"].replace(
                 "TASKNAME", resolved_task.get("taskname", "")
             )
+
+        candidates = resolved_task.get("smart_candidates", [])
+        if candidates:
+            print("Top results:")
+            for idx, item in enumerate(candidates, 1):
+                episode = item.get("latest_episode")
+                episode_label = f"E{episode}" if episode is not None else "E?"
+                parts = [f"{idx}."]
+                if item.get("source"):
+                    parts.append(item.get("source"))
+                if item.get("channel"):
+                    parts.append(item.get("channel"))
+                parts.append(episode_label)
+                if item.get("shareurl"):
+                    parts.append(item.get("shareurl"))
+                print(" ".join(parts))
+            print()
 
         if resolved_task.get("smart_latest_episode") is not None:
             print(

@@ -527,48 +527,22 @@
                   </div>
                 </div>
                 <div class="form-group row">
-                  <label class="col-sm-2 col-form-label">Save rules</label>
-                  <div class="col-sm-10">
-                    <div class="input-group">
-                      <input type="text" class="form-control" v-model="task.pattern" placeholder="Pattern" list="magicRegex">
-                      <input type="text" class="form-control" v-model="task.replace" placeholder="Replace">
-                      <div class="input-group-append" title="Ignore extension when comparing file name">
-                        <div class="input-group-text">
-                          <input type="checkbox" v-model="task.ignore_extension">&nbsp;Ignore ext
-                        </div>
-                      </div>
+                  <label class="col-sm-2 col-form-label">Save mode</label>
+                  <div class="col-sm-10 col-form-label">
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio" :name="`smart-save-mode-${index}`" v-model="task.save_whole_folder" :value="false">
+                      <label class="form-check-label">Only save latest episodes</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio" :name="`smart-save-mode-${index}`" v-model="task.save_whole_folder" :value="true">
+                      <label class="form-check-label">Save whole folder (include subfolders)</label>
                     </div>
                   </div>
                 </div>
-                <div class="form-group row">
-                  <label class="col-sm-2 col-form-label">Update subdir</label>
-                  <div class="col-sm-10">
-                    <div class="input-group">
-                      <input type="text" class="form-control" v-model="task.update_subdir" placeholder="Optional">
-                      <div class="input-group-append" title="Resave mode">
-                        <div class="input-group-text">
-                          <input type="checkbox" v-model="task.update_subdir_resave_mode">&nbsp;Resave
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="form-group row">
-                  <label class="col-sm-2 col-form-label">Update after</label>
-                  <div class="col-sm-10">
-                    <input type="datetime-local" class="form-control" v-model="task.updated_after" placeholder="Optional">
-                  </div>
-                </div>
-                <div class="form-group row">
+                <div class="form-group row" v-if="!task.save_whole_folder">
                   <label class="col-sm-2 col-form-label">Recent episodes</label>
                   <div class="col-sm-10">
                     <input type="number" min="0" class="form-control" v-model.number="task.recent_episodes" placeholder="0 means no limit">
-                  </div>
-                </div>
-<div class="form-group row">
-                  <label class="col-sm-2 col-form-label">End date</label>
-                  <div class="col-sm-10">
-                    <input type="date" class="form-control" v-model="task.enddate" placeholder="Optional">
                   </div>
                 </div>
                 <div class="form-group row">
@@ -737,7 +711,7 @@
           <div class="modal-footer" v-if="fileSelect.selectDir && !fileSelect.previewRegex">
             <span v-html="fileSelect.selectShare ? '转存：' : '保存到：'"></span>
             <button type="button" class="btn btn-primary btn-sm" @click="selectCurrentFolder()">当前文件夹</button>
-            <button type="button" class="btn btn-primary btn-sm" v-if="!fileSelect.selectShare" @click="selectCurrentFolder(true)">当前文件夹<span class="badge badge-light" v-if="fileSelect.index<this.formData.tasklist.length" v-html="'/'+formData.tasklist[fileSelect.index].taskname"></span></button>
+            <button type="button" class="btn btn-primary btn-sm" v-if="!fileSelect.selectShare" @click="selectCurrentFolder(true)">当前文件夹<span class="badge badge-light" v-if="!fileSelect.isSmart && fileSelect.index<this.formData.tasklist.length" v-html="'/'+formData.tasklist[fileSelect.index].taskname"></span><span class="badge badge-light" v-else-if="fileSelect.isSmart && fileSelect.index<this.formData.smart_tasklist.length" v-html="'/'+formData.smart_tasklist[fileSelect.index].taskname"></span></button>
           </div>
         </div>
       </div>
@@ -815,6 +789,7 @@
           ignore_extension: false,
           updated_after: "",
           recent_episodes: 0,
+          save_whole_folder: false,
           update_subdir: "",
           update_subdir_resave_mode: false,
           runweek: [1, 2, 3, 4, 5, 6, 7]
@@ -926,6 +901,9 @@
                 }
                 if (!task.hasOwnProperty('recent_episodes')) {
                   task.recent_episodes = 0;
+                }
+                if (!task.hasOwnProperty('save_whole_folder')) {
+                  task.save_whole_folder = false;
                 }
                 return task;
               });
