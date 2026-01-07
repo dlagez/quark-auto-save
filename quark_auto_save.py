@@ -244,20 +244,26 @@ def resolve_smart_task(account, task):
     candidates = _search_task_suggestions(taskname, source_config, deep=1)
     if not candidates:
         return None, "未搜索到相关分享"
-    for item in candidates:
+    best_item = None
+    best_episode = None
+    for item in candidates[:20]:
         shareurl = item.get("shareurl")
         if not shareurl:
             continue
         latest_episode = _get_share_latest_episode(account, shareurl)
         if latest_episode is None:
             continue
-        resolved = copy.deepcopy(task)
-        resolved["shareurl"] = shareurl
-        resolved["smart_latest_episode"] = latest_episode
-        resolved["smart_source"] = item.get("source", "")
-        resolved["smart_channel"] = item.get("channel", "")
-        return resolved, None
-    return None, "未解析到有效剧集"
+        if best_episode is None or latest_episode > best_episode:
+            best_episode = latest_episode
+            best_item = item
+    if best_item is None:
+        return None, "未解析到有效剧集"
+    resolved = copy.deepcopy(task)
+    resolved["shareurl"] = best_item.get("shareurl", "")
+    resolved["smart_latest_episode"] = best_episode
+    resolved["smart_source"] = best_item.get("source", "")
+    resolved["smart_channel"] = best_item.get("channel", "")
+    return resolved, None
 
 
 class Config:
