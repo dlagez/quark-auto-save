@@ -332,6 +332,17 @@ def test_smart_task():
         try:
             for line in iter(process.stdout.readline, ""):
                 logging.info(line.strip())
+                if "__RUN_SUMMARY__" in line:
+                    payload = line.split("__RUN_SUMMARY__", 1)[1].strip()
+                    try:
+                        summary = json.loads(payload)
+                        config_data["last_run_summary"] = summary
+                        config_data["last_run_details"] = summary.get("details", [])
+                        Config.write_json(CONFIG_PATH, config_data)
+                    except Exception:
+                        pass
+                    yield f"data: {line}\n\n"
+                    continue
                 yield f"data: {line}\n\n"
             yield "data: [DONE]\n\n"
         finally:

@@ -46,6 +46,13 @@ except Exception:
 CONFIG_DATA = {}
 NOTIFYS = []
 GH_PROXY = os.environ.get("GH_PROXY", "https://ghproxy.net/")
+RUN_STATS = {
+    "success": 0,
+    "failed": 0,
+    "new_files": 0,
+    "timestamp": "",
+    "details": [],
+}
 
 
 # 发送通知消息
@@ -71,6 +78,31 @@ def add_notify(text):
     print("📢", text)
     return text
 
+
+def _count_new_files(tree):
+    try:
+        count = 0
+        for node in tree.all_nodes():
+            data = node.data or {}
+            if not data.get("is_dir"):
+                count += 1
+        return count
+    except Exception:
+        return 0
+
+
+def _add_run_detail(task, status, new_files=0, message=""):
+    try:
+        RUN_STATS["details"].append({
+            "taskname": task.get("taskname", ""),
+            "status": status,
+            "new_files": new_files,
+            "savepath": task.get("savepath", ""),
+            "shareurl": task.get("shareurl", ""),
+            "message": message,
+        })
+    except Exception:
+        return
 
 def _find_episode_numbers(name):
     patterns = [
@@ -1175,6 +1207,8 @@ class Quark:
         # 判断资源失效记录
         if task.get("shareurl_ban"):
             print(f"《{task['taskname']}》：{task['shareurl_ban']}")
+            RUN_STATS["failed"] += 1
+            _add_run_detail(task, "failed", message=task.get("shareurl_ban", ""))
             return
 
         # 链接转换所需参数
@@ -1186,11 +1220,15 @@ class Quark:
             stoken = get_stoken["data"]["stoken"]
         elif get_stoken.get("status") == 500:
             print(f"跳过任务：网络异常 {get_stoken.get('message')}")
+            RUN_STATS["failed"] += 1
+            _add_run_detail(task, "failed", message=get_stoken.get("message", ""))
             return
         else:
             message = get_stoken.get("message")
             add_notify(f"❌《{task['taskname']}》：{message}\n")
             task["shareurl_ban"] = message
+            RUN_STATS["failed"] += 1
+            _add_run_detail(task, "failed", message=message)
             return
         # print("stoken: ", stoken)
 
@@ -1199,9 +1237,14 @@ class Quark:
             self.do_rename(updated_tree)
             print()
             add_notify(f"✅《{task['taskname']}》添加追更：\n{updated_tree}")
+            RUN_STATS["success"] += 1
+            new_files = _count_new_files(updated_tree)
+            RUN_STATS["new_files"] += new_files
+            _add_run_detail(task, "success", new_files=new_files)
             return updated_tree
         else:
             print(f"任务结束：没有新的转存任务")
+            _add_run_detail(task, "noop")
             return False
 
     def dir_check_and_save(self, task, pwd_id, stoken, pdir_fid="", subdir_path=""):
@@ -1604,6 +1647,8 @@ def do_save(account, tasklist=None, smart_tasklist=None):
         if not resolved_task:
             print(f"Auto search failed: {err}")
             add_notify(f"Auto search failed: {task.get('taskname','')}: {err}\n")
+            RUN_STATS["failed"] += 1
+            _add_run_detail(task, "failed", message=err)
             continue
         if resolved_task.get("savepath") and "TASKNAME" in resolved_task.get("savepath", ""):
             resolved_task["savepath"] = resolved_task["savepath"].replace(
@@ -1774,6 +1819,8 @@ def main():
         Config.write_json(config_path, CONFIG_DATA)
 
     print(f"===============程序结束===============")
+    RUN_STATS["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("__RUN_SUMMARY__" + json.dumps(RUN_STATS, ensure_ascii=False))
     duration = datetime.now() - start_time
     print(f"😃 运行时长: {round(duration.total_seconds(), 2)}s")
     print()
