@@ -13,6 +13,8 @@ import sys
 import json
 import time
 import random
+import sqlite3
+import uuid
 import requests
 import importlib
 import traceback
@@ -46,6 +48,12 @@ except Exception:
 CONFIG_DATA = {}
 NOTIFYS = []
 GH_PROXY = os.environ.get("GH_PROXY", "https://ghproxy.net/")
+LOG_DB_PATH = os.environ.get(
+    "TRANSFER_LOG_DB",
+    os.path.join(os.path.dirname(__file__), "config", "transfer_logs.db"),
+)
+RUN_ID = None
+_LOG_DB_READY = False
 
 
 # 发送通知消息
@@ -70,6 +78,159 @@ def add_notify(text):
     NOTIFYS.append(text)
     print("📢", text)
     return text
+
+
+def _init_log_db():
+    global _LOG_DB_READY
+    if _LOG_DB_READY:
+        return
+    try:
+        log_dir = os.path.dirname(LOG_DB_PATH)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        with sqlite3.connect(LOG_DB_PATH) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS transfer_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT,
+                    task_name TEXT,
+                    task_type TEXT,
+                    share_url TEXT,
+                    save_path TEXT,
+                    status TEXT,
+                    reason TEXT,
+                    saved_files INTEGER,
+                    saved_bytes INTEGER,
+                    saved_episodes TEXT,
+                    duration_ms INTEGER,
+                    account TEXT,
+                    details TEXT,
+                    created_at TEXT
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_transfer_logs_run_id ON transfer_logs(run_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_transfer_logs_created_at ON transfer_logs(created_at)"
+            )
+            columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(transfer_logs)").fetchall()
+            }
+            if "saved_episodes" not in columns:
+                conn.execute(
+                    "ALTER TABLE transfer_logs ADD COLUMN saved_episodes TEXT"
+                )
+        _LOG_DB_READY = True
+    except Exception as e:
+        print(f"日志数据库初始化失败: {e}")
+
+
+def _safe_json_dumps(data):
+    if data is None:
+        return None
+    try:
+        return json.dumps(data, ensure_ascii=False)
+    except Exception:
+        return None
+
+
+def _tree_log_summary(tree):
+    if not tree:
+        return 0, None, [], None
+    saved_files = 0
+    saved_bytes = 0
+    files = []
+    episodes = set()
+    try:
+        nodes = tree.all_nodes_itr()
+    except Exception:
+        nodes = []
+    for node in nodes:
+        data = node.data or {}
+        if data.get("is_dir"):
+            continue
+        saved_files += 1
+        name = data.get("file_name_re") or data.get("file_name") or ""
+        for num in _find_episode_numbers(name):
+            episodes.add(num)
+        item = {
+            "path": data.get("path"),
+            "fid": data.get("fid"),
+            "file_name": data.get("file_name"),
+            "file_name_re": data.get("file_name_re"),
+        }
+        size = data.get("size")
+        if isinstance(size, (int, float)):
+            item["size"] = int(size)
+            saved_bytes += int(size)
+        files.append(item)
+    episodes_sorted = sorted(episodes)
+    episodes_text = ",".join(str(num) for num in episodes_sorted) if episodes_sorted else None
+    return saved_files, (saved_bytes or None), files, episodes_text
+
+
+def log_transfer(
+    run_id,
+    task_name,
+    task_type,
+    share_url,
+    save_path,
+    status,
+    reason,
+    saved_files,
+    saved_bytes,
+    saved_episodes,
+    duration_ms,
+    account,
+    details,
+    created_at,
+):
+    _init_log_db()
+    try:
+        with sqlite3.connect(LOG_DB_PATH) as conn:
+            conn.execute(
+                """
+                INSERT INTO transfer_logs (
+                    run_id,
+                    task_name,
+                    task_type,
+                    share_url,
+                    save_path,
+                    status,
+                    reason,
+                    saved_files,
+                    saved_bytes,
+                    saved_episodes,
+                    duration_ms,
+                    account,
+                    details,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    task_name,
+                    task_type,
+                    share_url,
+                    save_path,
+                    status,
+                    reason,
+                    saved_files,
+                    saved_bytes,
+                    saved_episodes,
+                    duration_ms,
+                    account,
+                    details,
+                    created_at,
+                ),
+            )
+            conn.commit()
+    except Exception as e:
+        print(f"日志写入失败: {e}")
 
 
 def _find_episode_numbers(name):
@@ -309,8 +470,15 @@ def resolve_smart_task(account, task):
     limit = max(1, limit)
     workers = min(4, max(1, workers))
 
+    try:
+        recent_episodes = int(task.get("recent_episodes", 0) or 0)
+    except (TypeError, ValueError):
+        recent_episodes = 0
+
     best_item = None
     best_episode = None
+    fallback_item = None
+    fallback_episode = None
     candidates = candidates[:limit]
     candidate_results = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -324,28 +492,44 @@ def resolve_smart_task(account, task):
                     "channel": item.get("channel", ""),
                     "datetime": item.get("datetime", ""),
                     "latest_episode": None,
+                    "recent_files": [],
                 }
             )
             if not shareurl:
                 continue
             future = executor.submit(
-                _get_share_latest_episode, account, shareurl, timeout
+                _get_share_recent_info,
+                account,
+                shareurl,
+                recent_episodes,
+                timeout,
             )
             future_to_index[future] = idx
         for future in as_completed(future_to_index):
             try:
-                latest_episode = future.result()
+                latest_episode, recent_files = future.result()
             except Exception:
                 latest_episode = None
+                recent_files = []
             idx = future_to_index[future]
             candidate_results[idx]["latest_episode"] = latest_episode
-            if latest_episode is not None:
-                item = candidates[idx]
-                if best_episode is None or latest_episode > best_episode:
-                    best_episode = latest_episode
-                    best_item = item
+            candidate_results[idx]["recent_files"] = recent_files
+            if latest_episode is None:
+                continue
+            item = candidates[idx]
+            if fallback_episode is None or latest_episode > fallback_episode:
+                fallback_episode = latest_episode
+                fallback_item = item
+            if recent_episodes > 0 and len(recent_files) < recent_episodes:
+                continue
+            if best_episode is None or latest_episode > best_episode:
+                best_episode = latest_episode
+                best_item = item
     if best_item is None:
-        return None, "未解析到有效剧集"
+        if fallback_item is None:
+            return None, "未解析到有效剧集"
+        best_item = fallback_item
+        best_episode = fallback_episode
     resolved = copy.deepcopy(task)
     resolved["shareurl"] = best_item.get("shareurl", "")
     resolved["smart_latest_episode"] = best_episode
@@ -1405,6 +1589,7 @@ class Quark:
                             "path": f"{savepath}/{item['file_name_re']}",
                             "is_dir": item["dir"],
                             "obj_category": item.get("obj_category", ""),
+                            "size": item.get("size"),
                         },
                     )
         return tree
@@ -1532,6 +1717,14 @@ def do_save(account, tasklist=None, smart_tasklist=None):
 
     # 执行任务
     for index, task in enumerate(tasklist):
+        task_start = time.time()
+        status = "skip"
+        reason = None
+        saved_files = None
+        saved_bytes = None
+        saved_episodes = None
+        details = None
+        is_new_tree = None
         print()
         print(f"#{index+1}------------------")
         print(f"任务名称: {task['taskname']}")
@@ -1551,8 +1744,14 @@ def do_save(account, tasklist=None, smart_tasklist=None):
         # 判断任务周期
         if not is_time(task):
             print(f"任务不在运行周期内，跳过")
+            reason = "outside_schedule"
         else:
-            is_new_tree = account.do_save_task(task)
+            try:
+                is_new_tree = account.do_save_task(task)
+            except Exception as e:
+                status = "fail"
+                reason = str(e)
+                raise
 
             # 补充任务的插件配置
             def merge_dicts(a, b):
@@ -1571,6 +1770,18 @@ def do_save(account, tasklist=None, smart_tasklist=None):
             task["addition"] = merge_dicts(
                 task.get("addition", {}), task_plugins_config
             )
+            if task.get("shareurl_ban"):
+                status = "fail"
+                reason = task.get("shareurl_ban")
+            elif is_new_tree and hasattr(is_new_tree, "size") and is_new_tree.size(1) > 0:
+                status = "success"
+                saved_files, saved_bytes, files, saved_episodes = _tree_log_summary(
+                    is_new_tree
+                )
+                details = _safe_json_dumps({"files": files})
+            else:
+                status = "skip"
+                reason = "no_new_items"
             # 调用插件
             if is_new_tree:
                 print(f"🧩 调用插件")
@@ -1579,8 +1790,34 @@ def do_save(account, tasklist=None, smart_tasklist=None):
                         task = (
                             plugin.run(task, account=account, tree=is_new_tree) or task
                         )
+        duration_ms = int((time.time() - task_start) * 1000)
+        log_transfer(
+            RUN_ID,
+            task.get("taskname", ""),
+            "normal",
+            task.get("shareurl", ""),
+            task.get("savepath", ""),
+            status,
+            reason,
+            saved_files,
+            saved_bytes,
+            saved_episodes,
+            duration_ms,
+            account.nickname,
+            details,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
     # Smart tasks
     for index, task in enumerate(smart_tasklist):
+        task_start = time.time()
+        status = "skip"
+        reason = None
+        saved_files = None
+        saved_bytes = None
+        saved_episodes = None
+        details = None
+        resolved_task = None
+        is_new_tree = None
         print()
         print(f"#S{index+1}------------------")
         print(f"Task name: {task.get('taskname', '')}")
@@ -1598,12 +1835,49 @@ def do_save(account, tasklist=None, smart_tasklist=None):
         print()
         if not is_time(task):
             print("Outside schedule, skip")
+            reason = "outside_schedule"
+            duration_ms = int((time.time() - task_start) * 1000)
+            log_transfer(
+                RUN_ID,
+                task.get("taskname", ""),
+                "smart",
+                task.get("shareurl", ""),
+                task.get("savepath", ""),
+                status,
+                reason,
+                saved_files,
+                saved_bytes,
+                saved_episodes,
+                duration_ms,
+                account.nickname,
+                details,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
             continue
 
         resolved_task, err = resolve_smart_task(account, task)
         if not resolved_task:
             print(f"Auto search failed: {err}")
             add_notify(f"Auto search failed: {task.get('taskname','')}: {err}\n")
+            status = "fail"
+            reason = str(err)
+            duration_ms = int((time.time() - task_start) * 1000)
+            log_transfer(
+                RUN_ID,
+                task.get("taskname", ""),
+                "smart",
+                task.get("shareurl", ""),
+                task.get("savepath", ""),
+                status,
+                reason,
+                saved_files,
+                saved_bytes,
+                saved_episodes,
+                duration_ms,
+                account.nickname,
+                details,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
             continue
         if resolved_task.get("savepath") and "TASKNAME" in resolved_task.get("savepath", ""):
             resolved_task["savepath"] = resolved_task["savepath"].replace(
@@ -1635,9 +1909,33 @@ def do_save(account, tasklist=None, smart_tasklist=None):
 
         if str(os.environ.get("SMART_TEST_ONLY", "")).lower() == "true":
             print("Test mode: search only, skip save")
+            status = "skip"
+            reason = "smart_test_only"
+            duration_ms = int((time.time() - task_start) * 1000)
+            log_transfer(
+                RUN_ID,
+                resolved_task.get("taskname", task.get("taskname", "")),
+                "smart",
+                resolved_task.get("shareurl", task.get("shareurl", "")),
+                resolved_task.get("savepath", task.get("savepath", "")),
+                status,
+                reason,
+                saved_files,
+                saved_bytes,
+                saved_episodes,
+                duration_ms,
+                account.nickname,
+                details,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
             continue
 
-        is_new_tree = account.do_save_task(resolved_task)
+        try:
+            is_new_tree = account.do_save_task(resolved_task)
+        except Exception as e:
+            status = "fail"
+            reason = str(e)
+            raise
 
         def merge_dicts(a, b):
             result = a.copy()
@@ -1655,6 +1953,18 @@ def do_save(account, tasklist=None, smart_tasklist=None):
         resolved_task["addition"] = merge_dicts(
             resolved_task.get("addition", {}), task_plugins_config
         )
+        if resolved_task.get("shareurl_ban"):
+            status = "fail"
+            reason = resolved_task.get("shareurl_ban")
+        elif is_new_tree and hasattr(is_new_tree, "size") and is_new_tree.size(1) > 0:
+            status = "success"
+            saved_files, saved_bytes, files, saved_episodes = _tree_log_summary(
+                is_new_tree
+            )
+            details = _safe_json_dumps({"files": files})
+        else:
+            status = "skip"
+            reason = "no_new_items"
         if is_new_tree:
             print("Run plugins")
             for plugin_name, plugin in plugins.items():
@@ -1664,12 +1974,33 @@ def do_save(account, tasklist=None, smart_tasklist=None):
                         or resolved_task
                     )
 
+        duration_ms = int((time.time() - task_start) * 1000)
+        log_transfer(
+            RUN_ID,
+            resolved_task.get("taskname", task.get("taskname", "")),
+            "smart",
+            resolved_task.get("shareurl", task.get("shareurl", "")),
+            resolved_task.get("savepath", task.get("savepath", "")),
+            status,
+            reason,
+            saved_files,
+            saved_bytes,
+            saved_episodes,
+            duration_ms,
+            account.nickname,
+            details,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
     print()
 
 
 def main():
     global CONFIG_DATA
     start_time = datetime.now()
+    global RUN_ID
+    if not RUN_ID:
+        RUN_ID = os.environ.get("RUN_ID", uuid.uuid4().hex)
+    _init_log_db()
     print(f"===============程序开始===============")
     print(f"⏰ 执行时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print()

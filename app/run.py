@@ -24,6 +24,7 @@ import requests
 import hashlib
 import logging
 import traceback
+import sqlite3
 import base64
 import sys
 import os
@@ -69,6 +70,9 @@ def get_app_ver():
 PYTHON_PATH = os.environ.get("PYTHON_PATH", sys.executable)
 SCRIPT_PATH = os.environ.get("SCRIPT_PATH", "./quark_auto_save.py")
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "./config/quark_config.json")
+LOG_DB_PATH = os.environ.get(
+    "TRANSFER_LOG_DB", os.path.join(parent_dir, "config", "transfer_logs.db")
+)
 PLUGIN_FLAGS = os.environ.get("PLUGIN_FLAGS", "")
 DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 HOST = os.environ.get("HOST", "0.0.0.0")
@@ -183,6 +187,43 @@ def get_data():
     data["api_token"] = get_login_token()
     data["task_plugins_config_default"] = task_plugins_config_default
     return jsonify({"success": True, "data": data})
+
+
+@app.route("/transfer_logs")
+def transfer_logs():
+    if not is_login():
+        return jsonify({"success": False, "message": "unauthorized"})
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+    if limit < 1:
+        limit = 1
+    if limit > 200:
+        limit = 200
+    if not os.path.exists(LOG_DB_PATH):
+        return jsonify({"success": True, "data": []})
+    try:
+        with sqlite3.connect(LOG_DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(transfer_logs)").fetchall()
+            }
+            rows = conn.execute(
+                """
+                SELECT created_at, task_name, status, saved_episodes
+                FROM transfer_logs
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            data = [dict(row) for row in rows]
+        return jsonify({"success": True, "data": data})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
 
 
 # 更新数据

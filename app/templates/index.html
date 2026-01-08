@@ -376,6 +376,38 @@
                 </div>
               </div>
             </div>
+            <div class="row title mt-5">
+              <div class="col">
+                <h2>Transfer Logs</h2>
+              </div>
+              <div class="col text-right">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @click="loadTransferLogs()" :disabled="logsLoading">Refresh</button>
+              </div>
+            </div>
+            <div v-if="logsLoading" class="text-muted small mb-2">Loading...</div>
+            <div v-else-if="logsError" class="text-danger small mb-2">{{ logsError }}</div>
+            <div v-else-if="!transferLogs.length" class="text-muted small mb-2">No logs</div>
+            <div class="table-responsive">
+              <table class="table table-sm table-striped">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Task</th>
+                    <th>Status</th>
+                    <th>Episodes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(log, index) in transferLogs" :key="`log-${index}`">
+                    <td v-html="log.created_at || ''"></td>
+                    <td v-html="log.task_name || ''"></td>
+                    <td v-html="log.status || ''"></td>
+                    <td v-html="log.saved_episodes || '-'"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
           </div>
 
           <div class="bottom-buttons">
@@ -649,6 +681,9 @@
           runweek: [1, 2, 3, 4, 5, 6, 7]
         },
         run_log: "",
+        transferLogs: [],
+        logsLoading: false,
+        logsError: "",
         taskDirs: [""],
         taskDirSelected: "",
         taskNameFilter: "",
@@ -711,6 +746,7 @@
       },
       mounted() {
         this.fetchData();
+        this.loadTransferLogs();
         this.checkNewVersion();
         $('[data-toggle="tooltip"]').tooltip();
         document.addEventListener('keydown', this.handleKeyDown);
@@ -832,6 +868,24 @@
             })
             .catch(error => {
               console.error('Error fetching data:', error);
+            });
+        },
+        loadTransferLogs() {
+          this.logsLoading = true;
+          this.logsError = "";
+          axios.get('/transfer_logs', { params: { limit: 50 } })
+            .then(response => {
+              if (response.data && response.data.success) {
+                this.transferLogs = response.data.data || [];
+              } else {
+                this.logsError = (response.data && response.data.message) || 'Failed to load logs';
+              }
+            })
+            .catch(error => {
+              this.logsError = String(error || 'Failed to load logs');
+            })
+            .finally(() => {
+              this.logsLoading = false;
             });
         },
         handleKeyDown(event) {
@@ -1119,6 +1173,7 @@
                     if (refreshAfter) {
                       this.fetchData();
                     }
+                    this.loadTransferLogs();
                     break;
                   }
                   this.run_log += eventData.replace('<', '<​') + '\n';
