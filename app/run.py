@@ -220,14 +220,6 @@ def run_script_now():
         # 设置环境变量
         process_env = os.environ.copy()
         process_env["PYTHONIOENCODING"] = "utf-8"
-        if request.json.get("quark_test"):
-            process_env["QUARK_TEST"] = "true"
-            process_env["COOKIE"] = json.dumps(
-                request.json.get("cookie", []), ensure_ascii=False
-            )
-            process_env["PUSH_CONFIG"] = json.dumps(
-                request.json.get("push_config", {}), ensure_ascii=False
-            )
         if tasklist:
             process_env["TASKLIST"] = json.dumps(tasklist, ensure_ascii=False)
         smart_tasklist = request.json.get("smart_tasklist", [])
@@ -303,45 +295,45 @@ def smart_candidates():
         return jsonify({"success": False, "message": str(e)})
 
 
-@app.route("/test_smart_task", methods=["POST"])
-def test_smart_task():
-    if not is_login():
-        return jsonify({"success": False, "message": "未登录"})
-    smart_tasklist = request.json.get("smart_tasklist", [])
-    command = [PYTHON_PATH, "-u", SCRIPT_PATH, CONFIG_PATH]
-    logging.info(">>> Smart task test: search only")
+# @app.route("/test_smart_task", methods=["POST"])
+# def test_smart_task():
+#     if not is_login():
+#         return jsonify({"success": False, "message": "未登录"})
+#     smart_tasklist = request.json.get("smart_tasklist", [])
+#     command = [PYTHON_PATH, "-u", SCRIPT_PATH, CONFIG_PATH]
+#     logging.info(">>> Smart task test: search only")
 
-    def generate_output():
-        process_env = os.environ.copy()
-        process_env["PYTHONIOENCODING"] = "utf-8"
-        process_env["SMART_TEST_ONLY"] = "true"
-        if smart_tasklist:
-            process_env["SMART_TASKLIST"] = json.dumps(
-                smart_tasklist, ensure_ascii=False
-            )
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-            env=process_env,
-        )
-        try:
-            for line in iter(process.stdout.readline, ""):
-                logging.info(line.strip())
-                yield f"data: {line}\n\n"
-            yield "data: [DONE]\n\n"
-        finally:
-            process.stdout.close()
-            process.wait()
+#     def generate_output():
+#         process_env = os.environ.copy()
+#         process_env["PYTHONIOENCODING"] = "utf-8"
+#         process_env["SMART_TEST_ONLY"] = "true"
+#         if smart_tasklist:
+#             process_env["SMART_TASKLIST"] = json.dumps(
+#                 smart_tasklist, ensure_ascii=False
+#             )
+#         process = subprocess.Popen(
+#             command,
+#             stdout=subprocess.PIPE,
+#             stderr=subprocess.STDOUT,
+#             universal_newlines=True,
+#             encoding="utf-8",
+#             errors="replace",
+#             bufsize=1,
+#             env=process_env,
+#         )
+#         try:
+#             for line in iter(process.stdout.readline, ""):
+#                 logging.info(line.strip())
+#                 yield f"data: {line}\n\n"
+#             yield "data: [DONE]\n\n"
+#         finally:
+#             process.stdout.close()
+#             process.wait()
 
-    return Response(
-        stream_with_context(generate_output()),
-        content_type="text/event-stream;charset=utf-8",
-    )
+#     return Response(
+#         stream_with_context(generate_output()),
+#         content_type="text/event-stream;charset=utf-8",
+#     )
 
 
 @app.route("/task_suggestions")

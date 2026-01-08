@@ -1676,20 +1676,6 @@ def main():
     # 读取启动参数
     config_path = sys.argv[1] if len(sys.argv) > 1 else "quark_config.json"
     # 推送测试
-    if os.environ.get("QUARK_TEST", "").lower() == "true":
-        print(f"===============通知测试===============")
-        CONFIG_DATA["push_config"] = json.loads(os.environ.get("PUSH_CONFIG"))
-        send_ql_notify(
-            "【夸克自动转存】",
-            f"通知测试\n\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        )
-        print()
-        if cookies := json.loads(os.environ.get("COOKIE", "[]")):
-            print(f"===============转存测试===============")
-            accounts = Quark(cookies[0])
-            accounts.do_save_check("https://pan.quark.cn/s/1ed94d530d63", "/来自：分享")
-            print()
-        return
     # 从环境变量中获取 TASKLIST
     tasklist_from_env = []
     smart_tasklist_from_env = []
@@ -1703,28 +1689,13 @@ def main():
             tasklist_from_env = json.loads(tasklist_json)
         except Exception as e:
             print(f"从环境变量解析任务列表失败 {e}")
-    # 检查本地文件是否存在，如果不存在就下载
-    if not os.path.exists(config_path):
-        if os.environ.get("QUARK_COOKIE"):
-            print(
-                f"⚙️ 读取到 QUARK_COOKIE 环境变量，仅签到领空间。如需执行转存，请删除该环境变量后配置 {config_path} 文件"
-            )
-            cookie_val = os.environ.get("QUARK_COOKIE")
-            cookie_form_file = False
-        else:
-            print(f"⚙️ 配置文件 {config_path} 不存在❌，正远程从下载配置模版")
-            config_url = f"{GH_PROXY}https://raw.githubusercontent.com/Cp0204/quark_auto_save/main/quark_config.json"
-            if Config.download_file(config_url, config_path):
-                print("⚙️ 配置模版下载成功✅，请到程序目录中手动配置")
-            return
-    else:
-        print(f"⚙️ 正从 {config_path} 文件中读取配置")
-        CONFIG_DATA = Config.read_json(config_path)
-        Config.breaking_change_update(CONFIG_DATA)
-        if not CONFIG_DATA.get("smart_tasklist"):
-            CONFIG_DATA["smart_tasklist"] = []
-        cookie_val = CONFIG_DATA.get("cookie")
-        cookie_form_file = True
+    print(f"⚙️ 正从 {config_path} 文件中读取配置")
+    CONFIG_DATA = Config.read_json(config_path)
+    Config.breaking_change_update(CONFIG_DATA)
+    if not CONFIG_DATA.get("smart_tasklist"):
+        CONFIG_DATA["smart_tasklist"] = []
+    cookie_val = CONFIG_DATA.get("cookie")
+    cookie_form_file = True
     # 获取cookie
     cookies = Config.get_cookies(cookie_val)
     if not cookies:

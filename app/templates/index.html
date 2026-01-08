@@ -109,7 +109,6 @@
                 </span>
               </div>
               <div class="col-4 text-right">
-                <button type="button" class="btn btn-success" title="通知推送测试" @click="testPush()"><i class="bi bi-lightning"></i></button>
                 <button type="button" class="btn btn-outline-primary" @click="addPush()">+</button>
               </div>
             </div>
@@ -1072,9 +1071,6 @@
           if (this.formData.cookie[index] == "" || confirm("确认删除吗？"))
             this.formData.cookie.splice(index, 1);
         },
-        testPush() {
-          this.runScriptNow(1, true);
-        },
         addPush() {
           key = prompt("增加的键名", "");
           if (key != "" && key != null)
@@ -1269,15 +1265,9 @@
         clearData(target) {
           this[target] = "";
         },
-        async runScriptNow(task_index = null, test = false) {
+        async runScriptNow(task_index = null) {
           body = {};
-          if (test) {
-            body = {
-              "quark_test": true,
-              "cookie": this.formData.cookie,
-              "push_config": this.formData.push_config
-            };
-          } else if (task_index != null) {
+          if (task_index != null) {
             task = { ...this.formData.tasklist[task_index] };
             delete task.runweek;
             delete task.enddate;
