@@ -197,12 +197,21 @@ def transfer_logs():
         limit = int(request.args.get("limit", 50))
     except (TypeError, ValueError):
         limit = 50
+    try:
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        offset = 0
+    status = request.args.get("status")
+    if status:
+        status = status.strip().lower()
     if limit < 1:
         limit = 1
     if limit > 200:
         limit = 200
+    if offset < 0:
+        offset = 0
     if not os.path.exists(LOG_DB_PATH):
-        return jsonify({"success": True, "data": []})
+        return jsonify({"success": True, "data": [], "has_more": False})
     try:
         with sqlite3.connect(LOG_DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
@@ -210,22 +219,34 @@ def transfer_logs():
                 row[1]
                 for row in conn.execute("PRAGMA table_info(transfer_logs)").fetchall()
             }
-            rows = conn.execute(
-                """
+            if "saved_episodes" not in columns:
+                conn.execute(
+                    "ALTER TABLE transfer_logs ADD COLUMN saved_episodes TEXT"
+                )
+            where_clause = ""
+            params = []
+            if status and status != "all":
+                where_clause = "WHERE status = ?"
+                params.append(status)
+            query = f"""
                 SELECT created_at, task_name, status, saved_episodes
                 FROM transfer_logs
+                {where_clause}
                 ORDER BY id DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+                LIMIT ? OFFSET ?
+                """
+            params.extend([limit + 1, offset])
+            rows = conn.execute(query, tuple(params)).fetchall()
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
             data = [dict(row) for row in rows]
-        return jsonify({"success": True, "data": data})
+        return jsonify({"success": True, "data": data, "has_more": has_more})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
 
-
+#
 # 更新数据
 @app.route("/update", methods=["POST"])
 def update():

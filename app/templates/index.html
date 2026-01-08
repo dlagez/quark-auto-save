@@ -32,6 +32,9 @@
       <div class="navbar-actions ml-auto pr-3">
         <button type="button" class="btn btn-sm btn-outline-light navbar-config-btn" :class="{'is-active': activeTab === 'config'}" @click="changeTab('config')">
           <i class="bi bi-gear"></i> 系统配置</button>
+        <a class="btn btn-sm btn-outline-light navbar-config-btn" href="/logout">
+          <i class="bi bi-box-arrow-right"></i> 退出
+        </a>
       </div>
     </nav>
 
@@ -46,11 +49,7 @@
               </a>
             </li>
             <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted">dashboard</h6>
-            <li class="nav-item">
-              <a class="nav-link" href="/logout">
-                <i class="bi bi-box-arrow-right"></i></i> 退出
-              </a>
-            </li>
+            
           </ul>
           <div class="nav-bottom text-center">
             <p class="position-relative" hidden>
@@ -294,90 +293,106 @@
           </div>
 
           <div v-if="activeTab === 'tasklist'">
-            <div class="section-card">
+                        <div class="section-card">
               <div class="section-header">
                 <div>
                   <h2><i class="bi bi-stars section-title-icon"></i> Smart Task List</h2>
                   <p class="section-subtitle">Only enter the show name. The program will use deep search and pick the first share link that can parse episodes.</p>
                 </div>
+                <div class="section-actions">
+                  <input type="text" class="form-control form-control-sm smart-search" v-model="smartTaskQuery" placeholder="Search tasks">
+                  <select class="form-control form-control-sm smart-sort" v-model="smartTaskSort">
+                    <option value="default">Default</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                    <option value="last_run_desc">Last run</option>
+                  </select>
+                </div>
               </div>
               <div class="section-body">
-                <div v-for="(task, index) in formData.smart_tasklist" :key="`smart-${index}`" class="task mb-3">
-                  <hr>
-                  <div class="row align-items-center smart-task-summary">
-                    <div class="col-lg-4 col-md-6 mb-2 mb-lg-0">
-                      <label class="small text-muted">#S{{ index + 1 }} Task name</label>
-                      <input type="text" class="form-control" v-model="task.taskname" placeholder="Required">
-                    </div>
-                    <div class="col-lg-5 col-md-6 mb-2 mb-lg-0">
-                      <label class="small text-muted">Save path</label>
-                      <div class="input-group">
-                        <input type="text" class="form-control" v-model="task.savepath" placeholder="Required">
-                        <div class="input-group-append">
-                          <button class="btn btn-outline-secondary btn-sm" type="button" @click="fileSelect.sortBy='file_name';fileSelect.sortOrder='asc';showSavepathSelect(index, true)">Select</button>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-lg-3 text-lg-right">
-                      <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary btn-sm" @click="runSmartTaskNow(index)" title="Run smart task"><i class="bi bi-play-fill"></i></button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="collapse" :data-target="`#collapse_smart_${index}`" aria-expanded="false" :aria-controls="`collapse_smart_${index}`" title="Advanced"><i class="bi bi-sliders2"></i></button>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="collapse mt-3" :id="`collapse_smart_${index}`">
-                    <div class="form-group row">
-                      <label class="col-sm-2 col-form-label">Save mode</label>
-                      <div class="col-sm-10 col-form-label">
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" :name="`smart-save-mode-${index}`" v-model="task.save_whole_folder" :value="false">
-                          <label class="form-check-label">Only save latest episodes</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="radio" :name="`smart-save-mode-${index}`" v-model="task.save_whole_folder" :value="true">
-                          <label class="form-check-label">Save whole folder (include subfolders)</label>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="form-group row" v-if="!task.save_whole_folder">
-                      <label class="col-sm-2 col-form-label">Recent episodes</label>
-                      <div class="col-sm-10">
-                        <input type="number" min="0" class="form-control" v-model.number="task.recent_episodes" placeholder="0 means no limit">
-                      </div>
-                    </div>
-                    <div class="form-group row">
-                      <label class="col-sm-2 col-form-label">Run week</label>
-                      <div class="col-sm-10 col-form-label">
-                        <div class="form-check form-check-inline">
-                          <input class="form-check-input" type="checkbox" :checked="task.runweek.length === 7" @change="toggleAllWeekdays(task)" :indeterminate.prop="task.runweek.length > 0 && task.runweek.length < 7">
-                          <label class="form-check-label">All</label>
-                        </div>
-                        <div class="form-check form-check-inline" v-for="(day, index) in weekdays" :key="`smart-week-${index}`">
-                          <input class="form-check-input" type="checkbox" v-model="task.runweek" :value="index+1">
-                          <label class="form-check-label" v-html="day"></label>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="form-group row" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length">
-                      <label class="col-sm-2 col-form-label">Plugin options</label>
-                      <div class="col-sm-10">
-                        <v-jsoneditor v-model="task.addition" :options="{mode:'tree'}" :plus="false" height="180px"></v-jsoneditor>
-                      </div>
-                    </div>
-                    <div class="row">
-                      <div class="col-sm-12 text-right">
-                        <div class="btn-group" role="group" aria-label="smart-task-actions-advanced">
-                          <button type="button" class="btn btn-outline-secondary btn-sm" @click="openSmartCandidates(index)" title="Test search"><i class="bi bi-search"></i></button>
-                          <button type="button" class="btn btn-outline-danger btn-sm" @click="removeSmartTask(index)" title="Delete smart task"><i class="bi bi-trash3-fill"></i></button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div v-if="!filteredSmartTasks.length" class="empty-state">
+                  <div class="empty-title">No smart tasks</div>
+                  <div class="empty-sub">Add a task to start smart tracking.</div>
+                  <button type="button" class="btn btn-primary btn-sm" @click="addSmartTask()"><i class="bi bi-plus"></i> Add smart task</button>
                 </div>
-                <div class="row mt-3">
-                  <div class="col-sm-12 text-center">
-                    <div class="btn-group" role="group" aria-label="smart-task-actions">
-                      <button type="button" class="btn btn-primary" @click="addSmartTask()"><i class="bi bi-plus"></i> Add smart task</button>
+                <div v-else>
+                  <div v-for="item in filteredSmartTasks" :key="`smart-${item.index}`" class="task mb-3">
+                    <hr>
+                    <div class="row align-items-center smart-task-summary">
+                      <div class="col-lg-4 col-md-6 mb-2 mb-lg-0">
+                        <label class="small text-muted">#S{{ item.index + 1 }} Task name</label>
+                        <input type="text" class="form-control" v-model="item.task.taskname" placeholder="Required">
+                      </div>
+                      <div class="col-lg-5 col-md-6 mb-2 mb-lg-0">
+                        <label class="small text-muted">Save path</label>
+                        <div class="input-group">
+                          <input type="text" class="form-control" v-model="item.task.savepath" placeholder="Required">
+                          <div class="input-group-append">
+                            <button class="btn btn-outline-secondary btn-sm" type="button" @click="fileSelect.sortBy='file_name';fileSelect.sortOrder='asc';showSavepathSelect(item.index, true)">Select</button>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-lg-3 text-lg-right">
+                        <div class="btn-group">
+                          <button type="button" class="btn btn-outline-primary btn-sm" @click="runSmartTaskNow(item.index)" title="Run smart task"><i class="bi bi-play-fill"></i></button>
+                          <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="collapse" :data-target="`#collapse_smart_${item.index}`" aria-expanded="false" :aria-controls="`collapse_smart_${item.index}`" title="Advanced"><i class="bi bi-sliders2"></i></button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="collapse mt-3" :id="`collapse_smart_${item.index}`">
+                      <div class="form-group row">
+                        <label class="col-sm-2 col-form-label">Save mode</label>
+                        <div class="col-sm-10 col-form-label">
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" :name="`smart-save-mode-${item.index}`" v-model="item.task.save_whole_folder" :value="false">
+                            <label class="form-check-label">Only save latest episodes</label>
+                          </div>
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" :name="`smart-save-mode-${item.index}`" v-model="item.task.save_whole_folder" :value="true">
+                            <label class="form-check-label">Save whole folder (include subfolders)</label>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="form-group row" v-if="!item.task.save_whole_folder">
+                        <label class="col-sm-2 col-form-label">Recent episodes</label>
+                        <div class="col-sm-10">
+                          <input type="number" min="0" class="form-control" v-model.number="item.task.recent_episodes" placeholder="0 means no limit">
+                        </div>
+                      </div>
+                      <div class="form-group row">
+                        <label class="col-sm-2 col-form-label">Run week</label>
+                        <div class="col-sm-10 col-form-label">
+                          <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" :checked="item.task.runweek.length === 7" @change="toggleAllWeekdays(item.task)" :indeterminate.prop="item.task.runweek.length > 0 && item.task.runweek.length < 7">
+                            <label class="form-check-label">All</label>
+                          </div>
+                          <div class="form-check form-check-inline" v-for="(day, index) in weekdays" :key="`smart-week-${index}`">
+                            <input class="form-check-input" type="checkbox" v-model="item.task.runweek" :value="index+1">
+                            <label class="form-check-label" v-html="day"></label>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="form-group row" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length">
+                        <label class="col-sm-2 col-form-label">Plugin options</label>
+                        <div class="col-sm-10">
+                          <v-jsoneditor v-model="item.task.addition" :options="{mode:'tree'}" :plus="false" height="180px"></v-jsoneditor>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-sm-12 text-right">
+                          <div class="btn-group" role="group" aria-label="smart-task-actions-advanced">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @click="openSmartCandidates(item.index)" title="Test search"><i class="bi bi-search"></i></button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" @click="removeSmartTask(item.index)" title="Delete smart task"><i class="bi bi-trash3-fill"></i></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-sm-12 text-center">
+                      <div class="btn-group" role="group" aria-label="smart-task-actions">
+                        <button type="button" class="btn btn-primary" @click="addSmartTask()"><i class="bi bi-plus"></i> Add smart task</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -391,32 +406,53 @@
                   <p class="section-subtitle">Recent runs and saved episodes.</p>
                 </div>
                 <div class="section-actions">
-                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="loadTransferLogs()" :disabled="logsLoading">Refresh</button>
+                  <select class="form-control form-control-sm logs-filter" v-model="logsFilterStatus">
+                    <option value="all">All</option>
+                    <option value="success">Success</option>
+                    <option value="skip">Skip</option>
+                    <option value="fail">Fail</option>
+                  </select>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="loadTransferLogs(true)" :disabled="logsLoading">Refresh</button>
                 </div>
               </div>
               <div class="section-body">
                 <div v-if="logsLoading" class="text-muted small mb-2">Loading...</div>
                 <div v-else-if="logsError" class="text-danger small mb-2">{{ logsError }}</div>
-                <div v-else-if="!transferLogs.length" class="text-muted small mb-2">No logs</div>
-                <div class="table-responsive">
-                  <table class="table table-sm table-striped">
-                    <thead>
-                      <tr>
-                        <th>Time</th>
-                        <th>Task</th>
-                        <th>Status</th>
-                        <th class="text-right">Episodes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(log, index) in transferLogs" :key="`log-${index}`">
-                        <td v-html="log.created_at || ''"></td>
-                        <td v-html="log.task_name || ''"></td>
-                        <td><span class="badge badge-status" :class="statusClass(log.status)" v-html="log.status || ''"></span></td>
-                        <td class="text-right log-episodes" v-html="log.saved_episodes || '-'"></td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div v-else-if="!transferLogs.length" class="empty-state compact">
+                  <div class="empty-title">No logs yet</div>
+                  <div class="empty-sub">Run a task to generate logs.</div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="loadTransferLogs(true)">Refresh</button>
+                </div>
+                <div v-else>
+                  <div class="table-responsive logs-table-wrap" @scroll="onLogsScroll" ref="logsTable">
+                    <table class="table table-sm table-striped">
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Task</th>
+                          <th>Status</th>
+                          <th class="text-right">Episodes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="logsTopPadding" class="log-spacer">
+                          <td :style="{height: logsTopPadding + 'px'}" colspan="4"></td>
+                        </tr>
+                        <tr v-for="item in visibleLogs" :key="`log-${item.index}`">
+                          <td v-html="item.log.created_at || ''"></td>
+                          <td v-html="item.log.task_name || ''"></td>
+                          <td><span class="badge badge-status" :class="statusClass(item.log.status)" v-html="item.log.status || ''"></span></td>
+                          <td class="text-right log-episodes" v-html="item.log.saved_episodes || '-'"></td>
+                        </tr>
+                        <tr v-if="logsBottomPadding" class="log-spacer">
+                          <td :style="{height: logsBottomPadding + 'px'}" colspan="4"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="log-actions text-center mt-2" v-if="logsHasMore">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="loadMoreLogs()" :disabled="logsLoading">Load more</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -696,9 +732,19 @@
         transferLogs: [],
         logsLoading: false,
         logsError: "",
+        logsFilterStatus: "all",
+        logsPageSize: 50,
+        logsOffset: 0,
+        logsHasMore: false,
+        logsScrollTop: 0,
+        logsRowHeight: 32,
+        logsContainerHeight: 360,
+        logsBuffer: 6,
         taskDirs: [""],
         taskDirSelected: "",
         taskNameFilter: "",
+        smartTaskQuery: "",
+        smartTaskSort: "default",
         modalLoading: false,
         smart_param: {
           index: null,
@@ -734,6 +780,79 @@
           error: ""
         },
       },
+      computed: {
+        taskLastRunMap() {
+          const map = {};
+          this.transferLogs.forEach(log => {
+            const name = log.task_name;
+            const created = log.created_at;
+            if (!name || !created) {
+              return;
+            }
+            const ts = Date.parse(String(created).replace(' ', 'T'));
+            if (!Number.isNaN(ts)) {
+              if (!map[name] || ts > map[name]) {
+                map[name] = ts;
+              }
+            }
+          });
+          return map;
+        },
+        filteredSmartTasks() {
+          const query = this.smartTaskQuery.trim().toLowerCase();
+          const lastRunMap = this.taskLastRunMap;
+          let items = this.formData.smart_tasklist.map((task, index) => {
+            const name = String(task.taskname || '');
+            return {
+              task,
+              index,
+              nameLower: name.toLowerCase(),
+              lastRun: lastRunMap[name] || 0,
+            };
+          });
+          if (query) {
+            items = items.filter(item => item.nameLower.includes(query));
+          }
+          switch (this.smartTaskSort) {
+            case 'name_asc':
+              items.sort((a, b) => a.nameLower.localeCompare(b.nameLower));
+              break;
+            case 'name_desc':
+              items.sort((a, b) => b.nameLower.localeCompare(a.nameLower));
+              break;
+            case 'last_run_desc':
+              items.sort((a, b) => b.lastRun - a.lastRun || a.nameLower.localeCompare(b.nameLower));
+              break;
+            default:
+              break;
+          }
+          return items;
+        },
+        logsTotalHeight() {
+          return this.transferLogs.length * this.logsRowHeight;
+        },
+        logsVisibleStart() {
+          return Math.max(0, Math.floor(this.logsScrollTop / this.logsRowHeight));
+        },
+        logsVisibleCount() {
+          return Math.ceil(this.logsContainerHeight / this.logsRowHeight) + this.logsBuffer;
+        },
+        logsTopPadding() {
+          return this.logsVisibleStart * this.logsRowHeight;
+        },
+        logsBottomPadding() {
+          const remaining = this.logsTotalHeight - this.logsTopPadding - (this.visibleLogs.length * this.logsRowHeight);
+          return remaining > 0 ? remaining : 0;
+        },
+        visibleLogs() {
+          const start = this.logsVisibleStart;
+          const end = Math.min(this.transferLogs.length, start + this.logsVisibleCount);
+          return this.transferLogs.slice(start, end).map((log, idx) => ({
+            log,
+            index: start + idx,
+          }));
+        },
+      },
       filters: {
         ts2date: function (value) {
           const date = new Date(value);
@@ -746,9 +865,12 @@
           const index = srcsize ? Math.floor(Math.log(srcsize) / Math.log(1024)) : 0;
           const size = (srcsize / Math.pow(1024, index)).toFixed(1).replace(/\.?0+$/, "");
           return size + unitArr[index];
-        }
+        },
       },
       watch: {
+        logsFilterStatus() {
+          this.loadTransferLogs(true);
+        },
         formData: {
           handler(newVal, oldVal) {
             this.configModified = true;
@@ -758,7 +880,7 @@
       },
       mounted() {
         this.fetchData();
-        this.loadTransferLogs();
+        this.loadTransferLogs(true);
         this.checkNewVersion();
         $('[data-toggle="tooltip"]').tooltip();
         document.addEventListener('keydown', this.handleKeyDown);
@@ -882,13 +1004,41 @@
               console.error('Error fetching data:', error);
             });
         },
-        loadTransferLogs() {
+        loadTransferLogs(reset = false) {
+          if (reset) {
+            this.transferLogs = [];
+            this.logsOffset = 0;
+            this.logsHasMore = false;
+            this.logsScrollTop = 0;
+          }
           this.logsLoading = true;
           this.logsError = "";
-          axios.get('/transfer_logs', { params: { limit: 50 } })
+          const params = {
+            limit: this.logsPageSize,
+            offset: this.logsOffset,
+          };
+          if (this.logsFilterStatus && this.logsFilterStatus !== 'all') {
+            params.status = this.logsFilterStatus;
+          }
+          axios.get('/transfer_logs', { params })
             .then(response => {
               if (response.data && response.data.success) {
-                this.transferLogs = response.data.data || [];
+                const items = response.data.data || [];
+                if (reset) {
+                  this.transferLogs = items;
+                } else {
+                  this.transferLogs = this.transferLogs.concat(items);
+                }
+                this.logsHasMore = !!response.data.has_more;
+                this.logsOffset = this.transferLogs.length;
+                this.$nextTick(() => {
+                  if (this.$refs.logsTable) {
+                    this.logsContainerHeight = this.$refs.logsTable.clientHeight || this.logsContainerHeight;
+                    if (reset) {
+                      this.$refs.logsTable.scrollTop = 0;
+                    }
+                  }
+                });
               } else {
                 this.logsError = (response.data && response.data.message) || 'Failed to load logs';
               }
@@ -900,6 +1050,16 @@
               this.logsLoading = false;
             });
         },
+        loadMoreLogs() {
+          if (this.logsLoading || !this.logsHasMore) {
+            return;
+          }
+          this.loadTransferLogs(false);
+        },
+        onLogsScroll(event) {
+          this.logsScrollTop = event.target.scrollTop;
+        },
+
         statusClass(status) {
           if (!status) {
             return 'neutral';
@@ -1201,7 +1361,8 @@
                     if (refreshAfter) {
                       this.fetchData();
                     }
-                    this.loadTransferLogs();
+                    this.loadTransferLogs(true);
+                    this.showToast('Run completed', 'success');
                     break;
                   }
                   this.run_log += eventData.replace('<', '<​') + '\n';
@@ -1217,6 +1378,7 @@
             }
           } catch (error) {
             this.modalLoading = false;
+            this.showToast('Run failed', 'error');
             console.error('Error:', error);
           }
         },

@@ -6,6 +6,9 @@
   --border: #e5e7eb;
   --accent-green: #2f9e44;
   --accent-orange: #f08c00;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
 }
 
 body {
@@ -17,7 +20,7 @@ body {
 }
 
 main {
-  padding: 24px 28px 120px;
+  padding: var(--space-lg) 28px 120px;
 }
 
 a {
@@ -80,7 +83,7 @@ a:hover {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 20px;
+  padding: var(--space-lg);
   margin-top: 24px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
 }
@@ -112,6 +115,14 @@ a:hover {
   gap: 8px;
 }
 
+.section-actions .form-control.form-control-sm {
+  min-width: 140px;
+}
+
+.smart-search {
+  min-width: 200px;
+}
+
 .section-card .btn {
   border-radius: 10px;
 }
@@ -127,6 +138,10 @@ a:hover {
 
 hr {
   border-color: var(--border);
+}
+
+.form-group {
+  margin-bottom: var(--space-md);
 }
 
 .table {
@@ -148,6 +163,24 @@ hr {
 
 .log-episodes {
   font-variant-numeric: tabular-nums;
+}
+
+.logs-table-wrap {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.log-spacer td {
+  padding: 0 !important;
+  border: none !important;
+  height: 0;
+}
+
+.log-actions {
+  display: flex;
+  justify-content: center;
 }
 
 .badge-status {
@@ -187,6 +220,28 @@ hr {
 
 .smart-task-summary label {
   font-weight: 600;
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-state.compact {
+  padding: var(--space-md);
+}
+
+.empty-state .empty-title {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.empty-state .empty-sub {
+  margin-bottom: 12px;
 }
 
 table.jsoneditor-tree>tbody>tr.jsoneditor-expandable:first-child {
@@ -307,6 +362,7 @@ table.jsoneditor-tree>tbody>tr.jsoneditor-expandable:first-child {
   display: flex;
   align-items: center;
   height: 54px;
+  gap: 8px;
 }
 
 .navbar-config-btn {
