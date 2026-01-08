@@ -10,6 +10,7 @@ from flask import (
     redirect,
     Response,
     render_template,
+    send_file,
     send_from_directory,
     stream_with_context,
 )
@@ -187,6 +188,48 @@ def get_data():
     data["api_token"] = get_login_token()
     data["task_plugins_config_default"] = task_plugins_config_default
     return jsonify({"success": True, "data": data})
+
+
+@app.route("/config/export")
+def export_config():
+    if not is_login():
+        return jsonify({"success": False, "message": "未登录"})
+    config_path = os.path.abspath(CONFIG_PATH)
+    if not os.path.exists(config_path):
+        return jsonify({"success": False, "message": "配置文件不存在"})
+    return send_file(config_path, as_attachment=True)
+
+
+@app.route("/config/import", methods=["POST"])
+def import_config():
+    global config_data, task_plugins_config_default
+    if not is_login():
+        return jsonify({"success": False, "message": "未登录"})
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "配置格式错误"})
+    Config.breaking_change_update(data)
+    if not data.get("magic_regex"):
+        data["magic_regex"] = MagicRename().magic_regex
+    existing_webui = config_data.get("webui", {})
+    incoming_webui = data.get("webui") or existing_webui
+    data["webui"] = {
+        "username": os.environ.get("WEBUI_USERNAME")
+        or incoming_webui.get("username", "admin"),
+        "password": os.environ.get("WEBUI_PASSWORD")
+        or incoming_webui.get("password", "admin123"),
+    }
+    if not data.get("crontab"):
+        data["crontab"] = "0 8,18,20 * * *"
+    _, plugins_config_default, task_plugins_config_default = Config.load_plugins()
+    plugins_config_default.update(data.get("plugins", {}))
+    data["plugins"] = plugins_config_default
+    Config.write_json(CONFIG_PATH, data)
+    config_data.clear()
+    config_data.update(data)
+    if reload_tasks():
+        return jsonify({"success": True, "message": "配置导入成功"})
+    return jsonify({"success": True, "message": "配置导入成功，未配置定时任务"})
 
 
 @app.route("/transfer_logs")

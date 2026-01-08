@@ -71,6 +71,22 @@
         <form @submit.prevent="saveConfig" @keydown.enter.prevent>
 
           <div v-if="activeTab === 'config'">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-archive section-title-icon"></i> 配置导入导出</h2>
+                  <p class="section-subtitle">备份当前配置或从文件恢复。</p>
+                </div>
+                <div class="section-actions">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="exportConfig"><i class="bi bi-download"></i> 导出</button>
+                  <label class="btn btn-outline-secondary btn-sm mb-0">
+                    <i class="bi bi-upload"></i> 导入
+                    <input type="file" class="d-none" accept="application/json" @change="handleConfigImport">
+                  </label>
+                </div>
+              </div>
+              <div class="section-body small text-muted">导入会覆盖当前配置（未提供的登录信息会保留）。</div>
+            </div>
             <div class="row title">
               <div class="col-10">
                 <h2><i class="bi bi-cookie"></i> Cookie</h2>
@@ -1003,6 +1019,39 @@
             .catch(error => {
               console.error('Error fetching data:', error);
             });
+        },
+        exportConfig() {
+          window.location.href = '/config/export';
+        },
+        handleConfigImport(event) {
+          const file = event.target.files && event.target.files[0];
+          if (!file) {
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            let payload = null;
+            try {
+              payload = JSON.parse(reader.result);
+            } catch (error) {
+              this.showToast('配置文件不是有效 JSON', 'error');
+              return;
+            }
+            axios.post('/config/import', payload)
+              .then(response => {
+                if (response.data && response.data.success) {
+                  this.showToast(response.data.message || '配置导入成功', 'success');
+                  this.fetchData();
+                } else {
+                  this.showToast((response.data && response.data.message) || '配置导入失败', 'error');
+                }
+              })
+              .catch(error => {
+                this.showToast(String(error || '配置导入失败'), 'error');
+              });
+          };
+          reader.readAsText(file, 'utf-8');
+          event.target.value = '';
         },
         loadTransferLogs(reset = false) {
           if (reset) {
