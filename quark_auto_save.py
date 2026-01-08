@@ -120,10 +120,6 @@ def _init_log_db():
                 row[1]
                 for row in conn.execute("PRAGMA table_info(transfer_logs)").fetchall()
             }
-            if "saved_episodes" not in columns:
-                conn.execute(
-                    "ALTER TABLE transfer_logs ADD COLUMN saved_episodes TEXT"
-                )
         _LOG_DB_READY = True
     except Exception as e:
         print(f"日志数据库初始化失败: {e}")
