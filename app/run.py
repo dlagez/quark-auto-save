@@ -118,6 +118,24 @@ def get_login_token():
     return gen_md5(f"token{username}{password}+-*/")[8:24]
 
 
+def get_primary_cookie():
+    cookies = config_data.get("cookie")
+    if isinstance(cookies, list):
+        for cookie in cookies:
+            if cookie:
+                return cookie
+    elif isinstance(cookies, str) and cookies:
+        return cookies
+    return None
+
+
+def get_quark_account():
+    cookie = get_primary_cookie()
+    if not cookie:
+        return None
+    return Quark(cookie)
+
+
 def is_login():
     login_token = get_login_token()
     if session.get("token") == login_token or request.args.get("token") == login_token:
@@ -545,12 +563,11 @@ def get_share_detail():
     data["stoken"] = stoken
 
     # 正则处理预览
-    def preview_regex(data):
+    def preview_regex(data, account):
         task = request.json.get("task", {})
         magic_regex = request.json.get("magic_regex", {})
         mr = MagicRename(magic_regex)
         mr.set_taskname(task.get("taskname", ""))
-        account = Quark(config_data["cookie"][0])
         get_fids = account.get_fids([task.get("savepath", "")])
         if get_fids:
             dir_file_list = account.ls_dir(get_fids[0]["fid"])["data"]["list"]
@@ -590,7 +607,10 @@ def get_share_detail():
             mr.sort_file_list(data["list"])
 
     if request.json.get("task"):
-        preview_regex(data)
+        account = get_quark_account()
+        if not account:
+            return jsonify({"success": False, "message": "cookie not configured"})
+        preview_regex(data, account)
 
     return jsonify({"success": True, "data": data})
 
@@ -599,7 +619,9 @@ def get_share_detail():
 def get_savepath_detail():
     if not is_login():
         return jsonify({"success": False, "message": "未登录"})
-    account = Quark(config_data["cookie"][0])
+    account = get_quark_account()
+    if not account:
+        return jsonify({"success": False, "message": "cookie not configured"})
     paths = []
     if path := request.args.get("path"):
         path = re.sub(r"/+", "/", path)
@@ -635,7 +657,9 @@ def get_savepath_detail():
 def delete_file():
     if not is_login():
         return jsonify({"success": False, "message": "未登录"})
-    account = Quark(config_data["cookie"][0])
+    account = get_quark_account()
+    if not account:
+        return jsonify({"success": False, "message": "cookie not configured"})
     if fid := request.json.get("fid"):
         response = account.delete([fid])
     else:
