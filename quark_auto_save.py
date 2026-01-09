@@ -76,7 +76,7 @@ def send_ql_notify(title, body):
 def add_notify(text):
     global NOTIFYS
     NOTIFYS.append(text)
-    print("📢", text)
+    print("[notify]", text)
     return text
 
 
@@ -682,7 +682,7 @@ class Config:
         return plugins_available, plugins_config, task_plugins_config
 
     def breaking_change_update(config_data):
-        # 🔼 Update config v0.5.x to 0.6.0
+        # Update config v0.5.x to 0.6.0
         for task in config_data.get("tasklist", []):
             if "$TASKNAME" in task.get("replace", ""):
                 task["replace"] = task["replace"].replace("$TASKNAME", "{TASKNAME}")
@@ -1347,12 +1347,12 @@ class Quark:
                         ]
                         recycle_remove = self.recycle_remove(record_id_list)
                         print(f"清理转存: {recycle_remove}")
-                        print(f"✅ 转存测试成功")
+                        print("??????")
                         return True
-            print(f"❌ 转存测试失败: 中断")
+            print("??????: ??")
             return False
         except Exception as e:
-            print(f"❌ 转存测试失败: {str(e)}")
+            print(f"??????: {str(e)}")
             traceback.print_exc()
 
     def do_save_task(self, task):
@@ -1373,7 +1373,7 @@ class Quark:
             return
         else:
             message = get_stoken.get("message")
-            add_notify(f"❌《{task['taskname']}》：{message}\n")
+            add_notify(f"?{task['taskname']}??{message}\n")
             task["shareurl_ban"] = message
             return
         # print("stoken: ", stoken)
@@ -1382,7 +1382,7 @@ class Quark:
         if updated_tree.size(1) > 0:
             self.do_rename(updated_tree)
             print()
-            add_notify(f"✅《{task['taskname']}》添加追更：\n{updated_tree}")
+            add_notify(f"?{task['taskname']}??????\n{updated_tree}")
             return updated_tree
         else:
             print(f"任务结束：没有新的转存任务")
@@ -1397,14 +1397,14 @@ class Quark:
         if not share_file_list:
             if subdir_path == "":
                 task["shareurl_ban"] = "分享为空，文件已被分享者删除"
-                add_notify(f"❌《{task['taskname']}》：{task['shareurl_ban']}\n")
+                add_notify(f"?{task['taskname']}??{task['shareurl_ban']}\n")
             return tree
         elif (
             len(share_file_list) == 1
             and share_file_list[0]["dir"]
             and subdir_path == ""
         ):  # 仅有一个文件夹
-            print("🧠 该分享是一个文件夹，读取文件夹内列表")
+            print("??????????????????")
             share_file_list = self.get_detail(
                 pwd_id, stoken, share_file_list[0]["fid"]
             )["data"]["list"]
@@ -1435,7 +1435,7 @@ class Quark:
             if get_fids := self.get_fids([savepath]):
                 self.savepath_fid[savepath] = get_fids[0]["fid"]
             else:
-                print(f"❌ 目录 {savepath} fid获取失败，跳过转存")
+                print(f"?? {savepath} fid?????????")
                 return tree
         to_pdir_fid = self.savepath_fid[savepath]
         dir_file_list = self.ls_dir(to_pdir_fid)["data"]["list"]
@@ -1532,7 +1532,7 @@ class Quark:
                             if subdir_tree.size(1) > 0:
                                 # 合并子目录树
                                 tree.create_node(
-                                    "📁" + share_file["file_name"],
+                                    "[DIR] " + share_file["file_name"],
                                     share_file["fid"],
                                     parent=pdir_fid,
                                     data={
@@ -1574,7 +1574,7 @@ class Quark:
                 else:
                     err_msg = save_file_return["message"]
                 if err_msg:
-                    add_notify(f"❌《{task['taskname']}》转存失败：{err_msg}\n")
+                    add_notify(f"?{task['taskname']}??????{err_msg}\n")
             # 建立目录树
             if len(need_save_list) == len(save_as_top_fids):
                 for index, item in enumerate(need_save_list):
@@ -1605,19 +1605,19 @@ class Quark:
                 pass
             elif file.get("file_name_re") and file["file_name_re"] != file["file_name"]:
                 rename_ret = self.rename(file["fid"], file["file_name_re"])
-                print(f"重命名：{file['file_name']} → {file['file_name_re']}")
+                print(f"???: {file['file_name']} -> {file['file_name_re']}")
                 if rename_ret["code"] != 0:
-                    print(f"      ↑ 失败，{rename_ret['message']}")
+                    print(f"      ??: {rename_ret['message']}")
 
     def _get_file_icon(self, f):
         if f.get("dir"):
-            return "📁"
+            return "[DIR]"
         ico_maps = {
-            "video": "🎞️",
-            "image": "🖼️",
-            "audio": "🎵",
-            "doc": "📄",
-            "archive": "📦",
+            "video": "[VIDEO]",
+            "image": "[IMAGE]",
+            "audio": "[AUDIO]",
+            "doc": "[DOC]",
+            "archive": "[ARCHIVE]",
             "default": "",
         }
         return ico_maps.get(f.get("obj_category"), "")
@@ -1625,17 +1625,17 @@ class Quark:
 
 def verify_account(account):
     # 验证账号
-    print(f"▶️ 验证第{account.index}个账号")
+    print(f"???{account.index}???")
     if "__uid" not in account.cookie:
-        print(f"💡 不存在cookie必要参数，判断为仅签到")
+        print("???cookie???????????")
         return False
     else:
         account_info = account.init()
         if not account_info:
-            add_notify(f"👤 第{account.index}个账号登录失败，cookie无效❌")
+            add_notify(f"?{account.index}????????cookie??")
             return False
         else:
-            print(f"👤 账号昵称: {account_info['nickname']}✅")
+            print(f"????: {account_info['nickname']}")
             return True
 
 
@@ -1650,21 +1650,21 @@ def format_bytes(size_bytes: int) -> str:
 
 def do_sign(account):
     if not account.mparam:
-        print("⏭️ 移动端参数未设置，跳过签到")
+        print("?????????????")
         print()
         return
     # 每日领空间
     growth_info = account.get_growth_info()
     if growth_info:
-        growth_message = f"💾 {'88VIP' if growth_info['88VIP'] else '普通用户'} 总空间：{format_bytes(growth_info['total_capacity'])}，签到累计获得：{format_bytes(growth_info['cap_composition'].get('sign_reward', 0))}"
+        growth_message = f"{'88VIP' if growth_info['88VIP'] else '????'} ????{format_bytes(growth_info['total_capacity'])}????????{format_bytes(growth_info['cap_composition'].get('sign_reward', 0))}"
         if growth_info["cap_sign"]["sign_daily"]:
-            sign_message = f"📅 签到记录: 今日已签到+{int(growth_info['cap_sign']['sign_daily_reward']/1024/1024)}MB，连签进度({growth_info['cap_sign']['sign_progress']}/{growth_info['cap_sign']['sign_target']})✅"
+            sign_message = f"????: ?????+{int(growth_info['cap_sign']['sign_daily_reward']/1024/1024)}MB?????({growth_info['cap_sign']['sign_progress']}/{growth_info['cap_sign']['sign_target']})"
             message = f"{sign_message}\n{growth_message}"
             print(message)
         else:
             sign, sign_return = account.get_growth_sign()
             if sign:
-                sign_message = f"📅 执行签到: 今日签到+{int(sign_return/1024/1024)}MB，连签进度({growth_info['cap_sign']['sign_progress']+1}/{growth_info['cap_sign']['sign_target']})✅"
+                sign_message = f"????: ????+{int(sign_return/1024/1024)}MB?????({growth_info['cap_sign']['sign_progress']+1}/{growth_info['cap_sign']['sign_target']})"
                 message = f"{sign_message}\n{growth_message}"
                 if (
                     str(
@@ -1678,14 +1678,14 @@ def do_sign(account):
                     message = message.replace("今日", f"[{account.nickname}]今日")
                     add_notify(message)
             else:
-                print(f"📅 签到异常: {sign_return}")
+                print(f"????: {sign_return}")
     print()
 
 
 def do_save(account, tasklist=None, smart_tasklist=None):
     tasklist = tasklist or []
     smart_tasklist = smart_tasklist or []
-    print(f"🧩 载入插件")
+    print("????")
     plugins, CONFIG_DATA["plugins"], task_plugins_config = Config.load_plugins(
         CONFIG_DATA.get("plugins", {})
     )
@@ -1785,7 +1785,7 @@ def do_save(account, tasklist=None, smart_tasklist=None):
                 reason = "no_new_items"
             # 调用插件
             if is_new_tree:
-                print(f"🧩 调用插件")
+                print("????")
                 for plugin_name, plugin in plugins.items():
                     if plugin.is_active:
                         task = (
@@ -2003,7 +2003,7 @@ def main():
         RUN_ID = os.environ.get("RUN_ID", uuid.uuid4().hex)
     _init_log_db()
     print(f"===============程序开始===============")
-    print(f"⏰ 执行时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"执行时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print()
     # 读取启动参数
     config_path = sys.argv[1] if len(sys.argv) > 1 else "quark_config.json"
@@ -2021,7 +2021,7 @@ def main():
             tasklist_from_env = json.loads(tasklist_json)
         except Exception as e:
             print(f"从环境变量解析任务列表失败 {e}")
-    print(f"⚙️ 正从 {config_path} 文件中读取配置")
+    print(f"正从 {config_path} 文件中读取配置")
     CONFIG_DATA = Config.read_json(config_path)
     Config.breaking_change_update(CONFIG_DATA)
     if not CONFIG_DATA.get("smart_tasklist"):
@@ -2031,7 +2031,7 @@ def main():
     # 获取cookie
     cookies = Config.get_cookies(cookie_val)
     if not cookies:
-        print("❌ cookie 未配置")
+        print("cookie ???")
         return
     accounts = [Quark(cookie, index) for index, cookie in enumerate(cookies)]
     if str(os.environ.get("SMART_CANDIDATES_ONLY", "")).lower() == "true":
@@ -2078,7 +2078,7 @@ def main():
 
     print(f"===============程序结束===============")
     duration = datetime.now() - start_time
-    print(f"😃 运行时长: {round(duration.total_seconds(), 2)}s")
+    print(f"????: {round(duration.total_seconds(), 2)}s")
     print()
 
 
