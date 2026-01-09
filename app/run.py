@@ -17,8 +17,8 @@ from flask import (
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sdk.cloudsaver import CloudSaver
-from sdk.pansou import PanSou
+from app.sdk.cloudsaver import CloudSaver
+from app.sdk.pansou import PanSou
 from datetime import timedelta
 import subprocess
 import requests

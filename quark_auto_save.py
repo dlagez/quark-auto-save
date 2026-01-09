@@ -38,8 +38,8 @@ app_dir = os.path.join(os.path.dirname(__file__), "app")
 if os.path.isdir(app_dir) and app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 try:
-    from sdk.cloudsaver import CloudSaver
-    from sdk.pansou import PanSou
+    from app.sdk.cloudsaver import CloudSaver
+    from app.sdk.pansou import PanSou
 except Exception:
     CloudSaver = None
     PanSou = None
@@ -374,7 +374,7 @@ def _get_share_recent_info(account, shareurl, recent_episodes, timeout=None):
     except Exception:
         return None, []
 
-
+# searching function 
 def _search_task_suggestions(query, source_config, deep=1):
     results = []
     net_data = source_config.get("net", {})
@@ -416,14 +416,15 @@ def _search_task_suggestions(query, source_config, deep=1):
                     cs_data["token"] = search.get("new_token")
                 results.extend(cs.clean_search_results(search.get("data")))
         except Exception:
-            pass
+            print('CloudSaver searching error')
 
     if PanSou and ps_data.get("server"):
         try:
             ps = PanSou(ps_data.get("server"))
             results.extend(ps.search(query, deep == 1))
+            # print pansou result
         except Exception:
-            pass
+            print('pansou searching error')
 
     results.sort(key=lambda x: x.get("datetime", ""), reverse=True)
     deduped = []
@@ -1685,7 +1686,6 @@ def do_sign(account):
 def do_save(account, tasklist=None, smart_tasklist=None):
     tasklist = tasklist or []
     smart_tasklist = smart_tasklist or []
-    print("????")
     plugins, CONFIG_DATA["plugins"], task_plugins_config = Config.load_plugins(
         CONFIG_DATA.get("plugins", {})
     )

@@ -1,8 +1,10 @@
+import os
 import re
+import sys
 
 import requests
 
-from sdk.common import iso_to_cst
+from app.sdk.common import iso_to_cst
 
 
 class PanSou:
@@ -88,7 +90,7 @@ class PanSou:
 if __name__ == "__main__":
     server: str = "https://so.252035.xyz"
     pansou = PanSou(server)
-    results = pansou.search("哪吒")
+    results = pansou.search("窥探")
     for item in results:
         print(f"标题: {item['taskname']}")
         print(f"描述: {item['content']}")
