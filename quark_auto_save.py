@@ -1418,6 +1418,7 @@ class Quark:
             recent_episodes = int(task.get("recent_episodes", 0) or 0)
         except (TypeError, ValueError):
             recent_episodes = 0
+        latest_episode = None
         if recent_episodes > 0:
             latest_episode = task.get("smart_latest_episode")
             if not latest_episode:

@@ -136,6 +136,53 @@ def get_quark_account():
     return Quark(cookie)
 
 
+def format_saved_episodes(value):
+    if value is None:
+        return "-"
+    if isinstance(value, (list, tuple, set)):
+        value = ",".join(str(item) for item in value)
+    text = str(value).strip()
+    if not text or text == "-":
+        return "-"
+    if not re.search(r"\d", text):
+        return text
+    tokens = re.split(r"[,\uFF0C]+", text)
+    numbers = []
+    for token in tokens:
+        current = token.strip()
+        if not current:
+            continue
+        if "-" in current:
+            parts = re.findall(r"-?\d+", current)
+            if len(parts) >= 2:
+                start = int(parts[0])
+                end = int(parts[1])
+                if end < start:
+                    start, end = end, start
+                numbers.extend(range(start, end + 1))
+                continue
+        match = re.search(r"-?\d+", current)
+        if match:
+            numbers.append(int(match.group(0)))
+    if not numbers:
+        return text
+    numbers = sorted(set(numbers))
+    ranges = []
+    start = numbers[0]
+    prev = numbers[0]
+    for num in numbers[1:]:
+        if num == prev + 1:
+            prev = num
+            continue
+        ranges.append(str(start) if start == prev else f"{start}-{prev}")
+        start = num
+        prev = num
+    ranges.append(str(start) if start == prev else f"{start}-{prev}")
+    if len(numbers) > 10 and len(ranges) > 1:
+        return f"{numbers[0]}-{numbers[-1]}"
+    return ",".join(ranges)
+
+
 def is_login():
     login_token = get_login_token()
     if session.get("token") == login_token or request.args.get("token") == login_token:
@@ -302,6 +349,10 @@ def transfer_logs():
             if has_more:
                 rows = rows[:limit]
             data = [dict(row) for row in rows]
+            for item in data:
+                item["saved_episodes"] = format_saved_episodes(
+                    item.get("saved_episodes")
+                )
         return jsonify({"success": True, "data": data, "has_more": has_more})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
