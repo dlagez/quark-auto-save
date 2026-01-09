@@ -87,221 +87,255 @@
               </div>
               <div class="section-body small text-muted">导入会覆盖当前配置（未提供的登录信息会保留）。</div>
             </div>
-            <div class="row title">
-              <div class="col-10">
-                <h2><i class="bi bi-cookie"></i> Cookie</h2>
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-cookie section-title-icon"></i> Cookie</h2>
+                </div>
+                <div class="section-actions">
+                  <button type="button" class="btn btn-outline-primary btn-sm" @click="addCookie()">+</button>
+                </div>
               </div>
-              <div class="col-2 text-right">
-                <button type="button" class="btn btn-outline-primary" @click="addCookie()">+</button>
-              </div>
-            </div>
-            <p>1. 所有账号执行签到，纯<a class="" href="https://github.com/Cp0204/quark-auto-save/wiki/使用技巧集锦#每日签到领空间">签到</a>只需移动端参数即可！</p>
-            <p>2. 仅第一个账号执行转存，请自行确认顺序。<b>最好是手机验证码<a target="_blank" href="https://pan.quark.cn/">登录</a>，CK比较完整！</b>如需签到参数附在CK后面。</p>
-            <div v-for="(value, index) in formData.cookie" :key="index" class="input-group mb-2">
-              <input type="text" v-model="formData.cookie[index]" class="form-control" placeholder="打开 pan.quark.com 按 F12 抓取">
-              <div class="input-group-append">
-                <button type="button" class="btn btn-outline-danger" @click="removeCookie(index)">-</button>
-              </div>
-            </div>
-
-            <div class="row title">
-              <div class="col">
-                <h2 style="display: inline-block;"><i class="bi bi-clock"></i> 定时规则</h2>
-                <span class="badge badge-pill badge-light">
-                  <a target="_blank" href="https://tool.lu/crontab/" title="CRON时间计算器">?</a>
-                </span>
-              </div>
-            </div>
-            <div class="input-group mb-2">
-              <div class="input-group-prepend">
-                <span class="input-group-text">Crontab</span>
-              </div>
-              <input type="text" v-model="formData.crontab" class="form-control" placeholder="必填">
-            </div>
-
-            <div class="row title" title="通知推送，支持多个渠道，见Wiki">
-              <div class="col-8">
-                <h2 style="display: inline-block;"><i class="bi bi-bell"></i> 通知</h2>
-                <span class="badge badge-pill badge-light">
-                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/通知推送服务配置" target="_blank">?</a>
-                </span>
-              </div>
-              <div class="col-4 text-right">
-                <button type="button" class="btn btn-outline-primary" @click="addPush()">+</button>
-              </div>
-            </div>
-            <div v-for="(value, key) in formData.push_config" :key="key" class="input-group mb-2">
-              <div class="input-group-prepend">
-                <span class="input-group-text" v-html="key"></span>
-              </div>
-              <div class="input-group-prepend" v-if="(key == 'DEER_KEY' || key == 'PUSH_KEY')">
-                <a type="button" class="btn btn-warning" target="_blank" href="https://sct.ftqq.com/r/13249" title="Server酱推荐计划"><i class="bi bi-award"></i></a>
-              </div>
-              <input type="text" v-model="formData.push_config[key]" class="form-control">
-              <div class="input-group-append">
-                <button type="button" class="btn btn-outline-danger" @click="removePush(key)">-</button>
-              </div>
-            </div>
-
-            <div class="row title" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length" title="各插件的配置选项，具体键值由插件定义，见Wiki">
-              <div class="col">
-                <h2 style="display: inline-block;"><i class="bi bi-plug"></i> 插件</h2>
-                <span class="badge badge-pill badge-light">
-                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/插件配置" target="_blank">?</a>
-                </span>
-              </div>
-            </div>
-            <div v-for="(plugin, pluginName) in getAvailablePlugins(formData.plugins)" :key="pluginName">
-              <div class="form-group row mb-0" style="display:flex; align-items:center;">
-                <div data-toggle="collapse" :data-target="'#collapse_'+pluginName" aria-expanded="true" :aria-controls="'collapse_'+pluginName">
-                  <div class="btn btn-block text-left">
-                    <i class="bi bi-caret-right-fill"></i> <span v-html="`${pluginName}`"></span>
+              <div class="section-body">
+                <p class="small text-muted">1. 所有账号执行签到，纯<a class="" href="https://github.com/Cp0204/quark-auto-save/wiki/使用技巧集锦#每日签到领空间">签到</a>只需移动端参数即可！</p>
+                <p class="small text-muted">2. 仅第一个账号执行转存，请自行确认顺序。<b>最好是手机验证码<a target="_blank" href="https://pan.quark.cn/">登录</a>，CK比较完整！</b>如需签到参数附在CK后面。</p>
+                <div v-for="(value, index) in formData.cookie" :key="index" class="input-group mb-2">
+                  <input type="text" v-model="formData.cookie[index]" class="form-control" placeholder="打开 pan.quark.com 按 F12 抓取">
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-danger" @click="removeCookie(index)">-</button>
                   </div>
                 </div>
               </div>
-              <div class="collapse ml-3" :id="'collapse_'+pluginName">
-                <div v-for="(value, key) in plugin" :key="key" class="form-group row">
-                  <label class="col-sm-2 col-form-label" v-html="key"></label>
+            </div>
+
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-clock section-title-icon"></i> 定时规则</h2>
+                </div>
+                <div class="section-actions">
+                  <a class="badge badge-pill badge-light" target="_blank" href="https://tool.lu/crontab/" title="CRON时间计算器">?</a>
+                </div>
+              </div>
+              <div class="section-body">
+                <div class="input-group mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Crontab</span>
+                  </div>
+                  <input type="text" v-model="formData.crontab" class="form-control" placeholder="必填">
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card" title="通知推送，支持多个渠道，见Wiki">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-bell section-title-icon"></i> 通知</h2>
+                </div>
+                <div class="section-actions">
+                  <a class="badge badge-pill badge-light" href="https://github.com/Cp0204/quark-auto-save/wiki/通知推送服务配置" target="_blank">?</a>
+                  <button type="button" class="btn btn-outline-primary btn-sm" @click="addPush()">+</button>
+                </div>
+              </div>
+              <div class="section-body">
+                <div v-for="(value, key) in formData.push_config" :key="key" class="input-group mb-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text" v-html="key"></span>
+                  </div>
+                  <div class="input-group-prepend" v-if="(key == 'DEER_KEY' || key == 'PUSH_KEY')">
+                    <a type="button" class="btn btn-warning" target="_blank" href="https://sct.ftqq.com/r/13249" title="Server酱推荐计划"><i class="bi bi-award"></i></a>
+                  </div>
+                  <input type="text" v-model="formData.push_config[key]" class="form-control">
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-danger" @click="removePush(key)">-</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card" v-if="Object.keys(getAvailablePlugins(formData.plugins)).length" title="各插件的配置选项，具体键值由插件定义，见Wiki">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-plug section-title-icon"></i> 插件</h2>
+                </div>
+                <div class="section-actions">
+                  <a class="badge badge-pill badge-light" href="https://github.com/Cp0204/quark-auto-save/wiki/插件配置" target="_blank">?</a>
+                </div>
+              </div>
+              <div class="section-body">
+                <div v-for="(plugin, pluginName) in getAvailablePlugins(formData.plugins)" :key="pluginName" class="sub-card">
+                  <div class="form-group row mb-0" style="display:flex; align-items:center;">
+                    <div data-toggle="collapse" :data-target="'#collapse_'+pluginName" aria-expanded="true" :aria-controls="'collapse_'+pluginName">
+                      <div class="btn btn-block text-left">
+                        <i class="bi bi-caret-right-fill"></i> <span v-html="`${pluginName}`"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="collapse mt-3" :id="'collapse_'+pluginName">
+                    <div v-for="(value, key) in plugin" :key="key" class="form-group row">
+                      <label class="col-sm-2 col-form-label" v-html="key"></label>
+                      <div class="col-sm-10">
+                        <input type="text" v-model="formData.plugins[pluginName][key]" class="form-control">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card" title="预定义的正则匹配规则，在任务列表中可直接点击使用">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-magic section-title-icon"></i> 魔法匹配</h2>
+                </div>
+                <div class="section-actions">
+                  <a class="badge badge-pill badge-light" href="https://github.com/Cp0204/quark-auto-save/wiki/正则处理教程#21-魔法匹配" target="_blank">?</a>
+                  <button type="button" class="btn btn-outline-primary btn-sm" @click="addMagicRegex()">+</button>
+                </div>
+              </div>
+              <div class="section-body">
+                <div v-for="(value, key) in formData.magic_regex" :key="key" class="form-group mb-2">
+                  <div class="input-group">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text">魔法名</span>
+                    </div>
+                    <input type="text" :data-oldkey="key" v-model="key" class="form-control" @change="updateMagicRegexKey($event.target.dataset.oldkey, $event.target.value)" placeholder="自定义名称">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text">正则处理</span>
+                    </div>
+                    <input type="text" v-model="value.pattern" class="form-control" placeholder="匹配表达式">
+                    <input type="text" v-model="value.replace" class="form-control" placeholder="替换表达式">
+                    <div class="input-group-append">
+                      <button type="button" class="btn btn-outline-danger" @click="removeMagicRegex(key)">-</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <div class="section-card" title="API接口，用以第三方添加任务等操作，见Wiki">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-link-45deg section-title-icon"></i> API</h2>
+                </div>
+                <div class="section-actions">
+                  <a class="badge badge-pill badge-light" href="https://github.com/Cp0204/quark-auto-save/wiki/API接口" target="_blank">?</a>
+                </div>
+              </div>
+              <div class="section-body">
+                <div class="input-group">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">Token</span>
+                  </div>
+                  <input type="text" v-model="formData.api_token" class="form-control" style="background-color:white;" disabled>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card" title="资源搜索服务配置，用于任务名称智能搜索">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-search section-title-icon"></i> 资源搜索</h2>
+                </div>
+              </div>
+              <div class="section-body">
+                <div class="sub-card">
+                  <div class="form-group row mb-0" style="display:flex; align-items:center;">
+                    <div data-toggle="collapse" data-target="#collapse_net" aria-expanded="true" aria-controls="collapse_net">
+                      <div class="btn btn-block text-left">
+                        <i class="bi bi-caret-right-fill"></i> 网络公开搜索
+                      </div>
+                    </div>
+                  </div>
+                  <div class="collapse show mt-3" id="collapse_net">
+                    <div class="form-group row">
+                      <label class="col-sm-2 col-form-label">启用</label>
+                      <div class="col-sm-10 d-flex align-items-center">
+                        <input type="checkbox" class="form-check-input" v-model="formData.source.net.enable" placeholder="是否启用网络公开搜索，默认启用">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="sub-card">
+                  <div class="form-group row mb-0" style="display:flex; align-items:center;">
+                    <div data-toggle="collapse" data-target="#collapse_cloudsaver" aria-expanded="true" aria-controls="collapse_cloudsaver">
+                      <div class="btn btn-block text-left">
+                        <i class="bi bi-caret-right-fill"></i> CloudSaver
+                        <span class="badge badge-pill badge-light">
+                          <a href="https://github.com/Cp0204/quark-auto-save/wiki/CloudSaver搜索源" target="_blank">?</a>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="collapse show mt-3" id="collapse_cloudsaver">
+                    <div class="form-group row">
+                      <label class="col-sm-2 col-form-label">服务器</label>
+                      <div class="col-sm-10">
+                        <input type="text" v-model="formData.source.cloudsaver.server" class="form-control" placeholder="资源搜索服务器地址，如 http://172.17.0.1:8008">
+                      </div>
+                    </div>
+                    <div class="form-group row">
+                      <label class="col-sm-2 col-form-label">用户名</label>
+                      <div class="col-sm-10">
+                        <input type="text" v-model="formData.source.cloudsaver.username" class="form-control" placeholder="用户名">
+                      </div>
+                    </div>
+                    <div class="form-group row">
+                      <label class="col-sm-2 col-form-label">密码</label>
+                      <div class="col-sm-10">
+                        <input type="password" v-model="formData.source.cloudsaver.password" class="form-control" placeholder="密码">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="sub-card">
+                  <div class="form-group row mb-0" style="display:flex; align-items:center;">
+                    <div data-toggle="collapse" data-target="#collapse_pansou" aria-expanded="true" aria-controls="collapse_pansou">
+                      <div class="btn btn-block text-left">
+                        <i class="bi bi-caret-right-fill"></i> PanSou
+                        <span class="badge badge-pill badge-light">
+                          <a href="https://github.com/fish2018/pansou" target="_blank">?</a>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="collapse show mt-3" id="collapse_pansou">
+                    <div class="form-group row">
+                      <label class="col-sm-2 col-form-label">服务器</label>
+                      <div class="col-sm-10">
+                        <input type="text" v-model="formData.source.pansou.server" class="form-control" placeholder="资源搜索服务器地址，如 https://so.252035.xyz">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="section-card" title="smart search settings">
+              <div class="section-header">
+                <div>
+                  <h2><i class="bi bi-sliders section-title-icon"></i> Smart Search</h2>
+                </div>
+              </div>
+              <div class="section-body">
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Top N</label>
                   <div class="col-sm-10">
-                    <input type="text" v-model="formData.plugins[pluginName][key]" class="form-control">
+                    <input type="number" min="1" class="form-control" v-model.number="formData.smart_search_limit" placeholder="Default 20">
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div class="row title" title="预定义的正则匹配规则，在任务列表中可直接点击使用">
-              <div class="col-10">
-                <h2 style="display: inline-block;"><i class="bi bi-magic"></i> 魔法匹配</h2>
-                <span class="badge badge-pill badge-light">
-                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/正则处理教程#21-魔法匹配" target="_blank">?</a>
-                </span>
-              </div>
-              <div class="col-2 text-right">
-                <button type="button" class="btn btn-outline-primary" @click="addMagicRegex()">+</button>
-              </div>
-            </div>
-            <div v-for="(value, key) in formData.magic_regex" :key="key" class="form-group mb-2">
-              <div class="input-group">
-                <div class="input-group-prepend">
-                  <span class="input-group-text">魔法名</span>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Workers</label>
+                  <div class="col-sm-10">
+                    <input type="number" min="1" max="4" class="form-control" v-model.number="formData.smart_search_workers" placeholder="Default 2">
+                  </div>
                 </div>
-                <input type="text" :data-oldkey="key" v-model="key" class="form-control" @change="updateMagicRegexKey($event.target.dataset.oldkey, $event.target.value)" placeholder="自定义名称">
-                <div class="input-group-prepend">
-                  <span class="input-group-text">正则处理</span>
+                <div class="form-group row">
+                  <label class="col-sm-2 col-form-label">Timeout (s)</label>
+                  <div class="col-sm-10">
+                    <input type="number" min="1" class="form-control" v-model.number="formData.smart_search_timeout" placeholder="Default 12">
+                  </div>
                 </div>
-                <input type="text" v-model="value.pattern" class="form-control" placeholder="匹配表达式">
-                <input type="text" v-model="value.replace" class="form-control" placeholder="替换表达式">
-                <div class="input-group-append">
-                  <button type="button" class="btn btn-outline-danger" @click="removeMagicRegex(key)">-</button>
-                </div>
-              </div>
-            </div>
-
-
-            <div class="row title" title="API接口，用以第三方添加任务等操作，见Wiki">
-              <div class="col-10">
-                <h2 style="display: inline-block;"><i class="bi bi-link-45deg"></i> API</h2>
-                <span class="badge badge-pill badge-light">
-                  <a href="https://github.com/Cp0204/quark-auto-save/wiki/API接口" target="_blank">?</a>
-                </span>
-              </div>
-            </div>
-            <div class="input-group">
-              <div class="input-group-prepend">
-                <span class="input-group-text">Token</span>
-              </div>
-              <input type="text" v-model="formData.api_token" class="form-control" style="background-color:white;" disabled>
-            </div>
-
-            <div class="row title" title="资源搜索服务配置，用于任务名称智能搜索">
-              <div class="col-10">
-                <h2 style="display: inline-block;"><i class="bi bi-search"></i> 资源搜索</h2>
-              </div>
-            </div>
-            <div class="form-group row mb-0" style="display:flex; align-items:center;">
-              <div data-toggle="collapse" data-target="#collapse_net" aria-expanded="true" aria-controls="collapse_net">
-                <div class="btn btn-block text-left">
-                  <i class="bi bi-caret-right-fill"></i> 网络公开搜索
-                </div>
-              </div>
-            </div>
-            <div class="collapse show ml-3" id="collapse_net">
-              <div class="form-group row">
-                <label class="col-sm-2 col-form-label">启用</label>
-                <div class="col-sm-10 d-flex align-items-center">
-                  <input type="checkbox" class="form-check-input" v-model="formData.source.net.enable" placeholder="是否启用网络公开搜索，默认启用">
-                </div>
-              </div>
-            </div>
-            <div class="form-group row mb-0" style="display:flex; align-items:center;">
-              <div data-toggle="collapse" data-target="#collapse_cloudsaver" aria-expanded="true" aria-controls="collapse_cloudsaver">
-                <div class="btn btn-block text-left">
-                  <i class="bi bi-caret-right-fill"></i> CloudSaver
-                  <span class="badge badge-pill badge-light">
-                    <a href="https://github.com/Cp0204/quark-auto-save/wiki/CloudSaver搜索源" target="_blank">?</a>
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="collapse show ml-3" id="collapse_cloudsaver">
-              <div class="form-group row">
-                <label class="col-sm-2 col-form-label">服务器</label>
-                <div class="col-sm-10">
-                  <input type="text" v-model="formData.source.cloudsaver.server" class="form-control" placeholder="资源搜索服务器地址，如 http://172.17.0.1:8008">
-                </div>
-              </div>
-              <div class="form-group row">
-                <label class="col-sm-2 col-form-label">用户名</label>
-                <div class="col-sm-10">
-                  <input type="text" v-model="formData.source.cloudsaver.username" class="form-control" placeholder="用户名">
-                </div>
-              </div>
-              <div class="form-group row">
-                <label class="col-sm-2 col-form-label">密码</label>
-                <div class="col-sm-10">
-                  <input type="password" v-model="formData.source.cloudsaver.password" class="form-control" placeholder="密码">
-                </div>
-              </div>
-            </div>
-            <div class="form-group row mb-0" style="display:flex; align-items:center;">
-              <div data-toggle="collapse" data-target="#collapse_pansou" aria-expanded="true" aria-controls="collapse_pansou">
-                <div class="btn btn-block text-left">
-                  <i class="bi bi-caret-right-fill"></i> PanSou
-                  <span class="badge badge-pill badge-light">
-                    <a href="https://github.com/fish2018/pansou" target="_blank">?</a>
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="collapse show ml-3" id="collapse_pansou">
-              <div class="form-group row">
-                <label class="col-sm-2 col-form-label">服务器</label>
-                <div class="col-sm-10">
-                  <input type="text" v-model="formData.source.pansou.server" class="form-control" placeholder="资源搜索服务器地址，如 https://so.252035.xyz">
-                </div>
-              </div>
-            </div>
-            <div class="row title" title="smart search settings">
-              <div class="col-10">
-                <h2 style="display: inline-block;"><i class="bi bi-sliders"></i> Smart Search</h2>
-              </div>
-            </div>
-            <div class="form-group row">
-              <label class="col-sm-2 col-form-label">Top N</label>
-              <div class="col-sm-10">
-                <input type="number" min="1" class="form-control" v-model.number="formData.smart_search_limit" placeholder="Default 20">
-              </div>
-            </div>
-            <div class="form-group row">
-              <label class="col-sm-2 col-form-label">Workers</label>
-              <div class="col-sm-10">
-                <input type="number" min="1" max="4" class="form-control" v-model.number="formData.smart_search_workers" placeholder="Default 2">
-              </div>
-            </div>
-            <div class="form-group row">
-              <label class="col-sm-2 col-form-label">Timeout (s)</label>
-              <div class="col-sm-10">
-                <input type="number" min="1" class="form-control" v-model.number="formData.smart_search_timeout" placeholder="Default 12">
               </div>
             </div>
 
@@ -332,9 +366,8 @@
                   <button type="button" class="btn btn-primary btn-sm" @click="addSmartTask()"><i class="bi bi-plus"></i> Add smart task</button>
                 </div>
                 <div v-else>
-                  <div v-for="item in filteredSmartTasks" :key="`smart-${item.index}`" class="task mb-3">
-                    <hr>
-                    <div class="row align-items-center smart-task-summary">
+                  <div v-for="item in filteredSmartTasks" :key="`smart-${item.index}`" class="task-card mb-3">
+                    <div class="row align-items-center smart-task-summary" @click="toggleSmartCollapse(item.index, $event)" role="button">
                       <div class="col-lg-4 col-md-6 mb-2 mb-lg-0">
                         <label class="small text-muted">#S{{ item.index + 1 }} Task name</label>
                         <input type="text" class="form-control" v-model="item.task.taskname" placeholder="Required">
@@ -349,10 +382,7 @@
                         </div>
                       </div>
                       <div class="col-lg-3 text-lg-right">
-                        <div class="btn-group">
-                          <button type="button" class="btn btn-outline-primary btn-sm" @click="runSmartTaskNow(item.index)" title="Run smart task"><i class="bi bi-play-fill"></i></button>
-                          <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle="collapse" :data-target="`#collapse_smart_${item.index}`" aria-expanded="false" :aria-controls="`collapse_smart_${item.index}`" title="Advanced"><i class="bi bi-sliders2"></i></button>
-                        </div>
+                        <button type="button" class="btn btn-outline-primary smart-run-btn" @click="runSmartTaskNow(item.index)" title="Run smart task"><i class="bi bi-play-fill"></i></button>
                       </div>
                     </div>
                     <div class="collapse mt-3" :id="`collapse_smart_${item.index}`">
@@ -1368,9 +1398,14 @@
             body = {
               "tasklist": [task]
             };
-          } else if (this.configModified) {
-            if (!confirm('?????????????????')) {
+          } else {
+            if (!confirm('确认运行所有任务吗？')) {
               return;
+            }
+            if (this.configModified) {
+              if (!confirm('?????????????????')) {
+                return;
+              }
             }
           }
           return this.runScriptWithBody(body, task_index == null);
@@ -1461,6 +1496,25 @@
           } else {
             task.runweek = [1, 2, 3, 4, 5, 6, 7];
           }
+        },
+        toggleSmartCollapse(index, event) {
+          const collapse = document.getElementById(`collapse_smart_${index}`);
+          if (!collapse) {
+            return;
+          }
+          const isOpen = collapse.classList.contains('show');
+          if (isOpen && this.isSmartToggleBlocked(event)) {
+            return;
+          }
+          $(collapse).collapse(isOpen ? 'hide' : 'show');
+        },
+        isSmartToggleBlocked(event) {
+          if (!event || !event.target) {
+            return false;
+          }
+          return Boolean(
+            event.target.closest('input, textarea, select, button, a, .btn, .form-control, .input-group, .form-check')
+          );
         },
         searchSuggestions(index, taskname, deep = 1) {
           taskname = taskname.replace(/\((19|20)\d{2}\)/g, '').trim();

@@ -327,10 +327,6 @@ def transfer_logs():
                 row[1]
                 for row in conn.execute("PRAGMA table_info(transfer_logs)").fetchall()
             }
-            if "saved_episodes" not in columns:
-                conn.execute(
-                    "ALTER TABLE transfer_logs ADD COLUMN saved_episodes TEXT"
-                )
             where_clause = ""
             params = []
             if status and status != "all":
