@@ -301,6 +301,26 @@ table.jsoneditor-tree>tbody>tr.jsoneditor-expandable:first-child {
   overflow-y: auto;
 }
 
+.confirm-modal {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.confirm-modal .modal-header,
+.confirm-modal .modal-footer {
+  border-color: var(--border);
+}
+
+.confirm-modal .modal-title {
+  font-weight: 700;
+}
+
+.confirm-modal .modal-body {
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
 .task-suggestions {
   width: 100%;
   max-height: 250px;

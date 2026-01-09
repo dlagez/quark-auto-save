@@ -697,6 +697,27 @@
       </div>
     </div>
 
+    <!-- 确认弹窗 -->
+    <div class="modal" tabindex="-1" id="confirmModal" data-backdrop="static" data-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content confirm-modal">
+          <div class="modal-header">
+            <h5 class="modal-title" v-text="confirmDialog.title"></h5>
+            <button type="button" class="close" @click="confirmDialogCancel" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0" v-text="confirmDialog.message"></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" @click="confirmDialogCancel" v-text="confirmDialog.cancelText"></button>
+            <button type="button" class="btn btn-primary" @click="confirmDialogConfirm" v-text="confirmDialog.confirmText"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <div class="toast-container">
       <div v-for="toast in toasts" :key="toast.id" class="toast show shadow-sm" :class="toast.type" role="alert" aria-live="assertive" aria-atomic="true">
@@ -792,6 +813,14 @@
         smartTaskQuery: "",
         smartTaskSort: "default",
         modalLoading: false,
+        confirmDialog: {
+          title: "请确认",
+          message: "",
+          confirmText: "确认",
+          cancelText: "取消",
+          pending: false,
+          resolve: null,
+        },
         smart_param: {
           index: null,
           savepath: "",
@@ -1399,11 +1428,21 @@
               "tasklist": [task]
             };
           } else {
-            if (!confirm('确认运行所有任务吗？')) {
+            const allConfirmed = await this.showConfirm("确认运行所有任务吗？", {
+              title: "运行全部任务",
+              confirmText: "运行全部",
+              cancelText: "取消"
+            });
+            if (!allConfirmed) {
               return;
             }
             if (this.configModified) {
-              if (!confirm('?????????????????')) {
+              const configConfirmed = await this.showConfirm("检测到配置尚未保存，仍要运行吗？", {
+                title: "配置未保存",
+                confirmText: "继续运行",
+                cancelText: "返回"
+              });
+              if (!configConfirmed) {
                 return;
               }
             }
@@ -1489,6 +1528,36 @@
             }
           }
           return availablePlugins;
+        },
+        showConfirm(message, options = {}) {
+          this.confirmDialog.title = options.title || "请确认";
+          this.confirmDialog.message = message || "";
+          this.confirmDialog.confirmText = options.confirmText || "确认";
+          this.confirmDialog.cancelText = options.cancelText || "取消";
+          this.confirmDialog.pending = true;
+          return new Promise((resolve) => {
+            this.confirmDialog.resolve = resolve;
+            $('#confirmModal').modal('show');
+          });
+        },
+        confirmDialogResolve(result) {
+          if (!this.confirmDialog.pending) {
+            return;
+          }
+          this.confirmDialog.pending = false;
+          const resolve = this.confirmDialog.resolve;
+          this.confirmDialog.resolve = null;
+          if (resolve) {
+            resolve(result);
+          }
+        },
+        confirmDialogConfirm() {
+          this.confirmDialogResolve(true);
+          $('#confirmModal').modal('hide');
+        },
+        confirmDialogCancel() {
+          this.confirmDialogResolve(false);
+          $('#confirmModal').modal('hide');
         },
         toggleAllWeekdays(task) {
           if (task.runweek.length === 7) {
