@@ -132,9 +132,14 @@
                 <div>
                   <h2><i class="bi bi-bell section-title-icon"></i> 通知</h2>
                 </div>
-                <div class="section-actions">
+                <div class="section-actions push-actions">
                   <a class="badge badge-pill badge-light" href="https://github.com/Cp0204/quark-auto-save/wiki/通知推送服务配置" target="_blank">?</a>
-                  <button type="button" class="btn btn-outline-primary btn-sm" @click="addPush()">+</button>
+                  <select class="form-control form-control-sm push-provider-select" v-model="selectedPushProvider">
+                    <option v-for="provider in pushProviders" :key="provider.id" :value="provider.id">{{ provider.label }}</option>
+                  </select>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="openPushHelp">说明</button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" @click="addPushProvider()">添加整组</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" @click="addPush()">自定义键</button>
                 </div>
               </div>
               <div class="section-body">
@@ -718,6 +723,34 @@
       </div>
     </div>
 
+    <!-- 通知渠道说明 -->
+    <div class="modal" tabindex="-1" id="pushHelpModal">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content push-help-modal">
+          <div class="modal-header">
+            <h5 class="modal-title">通知渠道说明</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div v-if="selectedPushProviderInfo">
+              <div class="push-help-title" v-text="selectedPushProviderInfo.label"></div>
+              <p class="text-muted mb-3" v-text="selectedPushProviderInfo.desc"></p>
+              <div class="push-help-keys mb-3">
+                <span class="badge badge-light" v-for="key in selectedPushProviderInfo.keys" :key="key">{{ key }}</span>
+              </div>
+              <div class="push-help-example">
+                <div class="small text-muted mb-1">示例</div>
+                <pre v-text="selectedPushProviderInfo.example"></pre>
+              </div>
+            </div>
+            <div v-else class="text-muted">请选择一个通知渠道。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示 -->
     <div class="toast-container">
       <div v-for="toast in toasts" :key="toast.id" class="toast show shadow-sm" :class="toast.type" role="alert" aria-live="assertive" aria-atomic="true">
@@ -813,6 +846,207 @@
         smartTaskQuery: "",
         smartTaskSort: "default",
         modalLoading: false,
+        pushProviders: [
+          {
+            id: "bark",
+            label: "Bark",
+            desc: "Bark 推送服务，填写设备地址或设备码。",
+            keys: [
+              "BARK_PUSH",
+              "BARK_ARCHIVE",
+              "BARK_GROUP",
+              "BARK_SOUND",
+              "BARK_ICON",
+              "BARK_LEVEL",
+              "BARK_URL"
+            ],
+            example: "BARK_PUSH=https://api.day.app/xxxx\nBARK_GROUP=quark\nBARK_SOUND=telegraph",
+          },
+          {
+            id: "dingding",
+            label: "钉钉机器人",
+            desc: "钉钉群机器人，填写 token 与加签密钥。",
+            keys: ["DD_BOT_SECRET", "DD_BOT_TOKEN"],
+            example: "DD_BOT_TOKEN=xxxx\nDD_BOT_SECRET=xxxx",
+          },
+          {
+            id: "feishu",
+            label: "飞书机器人",
+            desc: "飞书群机器人 Webhook key。",
+            keys: ["FSKEY"],
+            example: "FSKEY=xxxx",
+          },
+          {
+            id: "gobot",
+            label: "go-cqhttp",
+            desc: "go-cqhttp 推送到 QQ 或群。",
+            keys: ["GOBOT_URL", "GOBOT_QQ", "GOBOT_TOKEN"],
+            example: "GOBOT_URL=http://127.0.0.1/send_private_msg\nGOBOT_QQ=user_id=123456\nGOBOT_TOKEN=token",
+          },
+          {
+            id: "gotify",
+            label: "Gotify",
+            desc: "Gotify 服务器与应用 token。",
+            keys: ["GOTIFY_URL", "GOTIFY_TOKEN", "GOTIFY_PRIORITY"],
+            example: "GOTIFY_URL=https://push.example.com\nGOTIFY_TOKEN=xxxx\nGOTIFY_PRIORITY=0",
+          },
+          {
+            id: "igot",
+            label: "iGot 聚合推送",
+            desc: "iGot 聚合推送 key。",
+            keys: ["IGOT_PUSH_KEY"],
+            example: "IGOT_PUSH_KEY=xxxx",
+          },
+          {
+            id: "serverchan",
+            label: "Server 酱",
+            desc: "Server 酱 key，兼容旧版与 Turbo。",
+            keys: ["PUSH_KEY"],
+            example: "PUSH_KEY=xxxx",
+          },
+          {
+            id: "pushdeer",
+            label: "PushDeer",
+            desc: "PushDeer key 与可选自建地址。",
+            keys: ["DEER_KEY", "DEER_URL"],
+            example: "DEER_KEY=xxxx\nDEER_URL=https://api2.pushdeer.com",
+          },
+          {
+            id: "synology",
+            label: "Synology Chat",
+            desc: "群晖 Chat Webhook 地址与 token。",
+            keys: ["CHAT_URL", "CHAT_TOKEN"],
+            example: "CHAT_URL=https://chat.example.com/webapi/entry.cgi\nCHAT_TOKEN=xxxx",
+          },
+          {
+            id: "pushplus",
+            label: "Push+",
+            desc: "Push+ 推送，支持多种模板与渠道。",
+            keys: [
+              "PUSH_PLUS_TOKEN",
+              "PUSH_PLUS_USER",
+              "PUSH_PLUS_TEMPLATE",
+              "PUSH_PLUS_CHANNEL",
+              "PUSH_PLUS_WEBHOOK",
+              "PUSH_PLUS_CALLBACKURL",
+              "PUSH_PLUS_TO"
+            ],
+            example: "PUSH_PLUS_TOKEN=xxxx\nPUSH_PLUS_CHANNEL=wechat\nPUSH_PLUS_TEMPLATE=markdown",
+          },
+          {
+            id: "weplus",
+            label: "微加机器人",
+            desc: "微加机器人 token 与接收者。",
+            keys: ["WE_PLUS_BOT_TOKEN", "WE_PLUS_BOT_RECEIVER", "WE_PLUS_BOT_VERSION"],
+            example: "WE_PLUS_BOT_TOKEN=xxxx\nWE_PLUS_BOT_RECEIVER=xxxxx",
+          },
+          {
+            id: "qmsg",
+            label: "qmsg 酱",
+            desc: "qmsg 酱 key 与类型。",
+            keys: ["QMSG_KEY", "QMSG_TYPE"],
+            example: "QMSG_KEY=xxxx\nQMSG_TYPE=send",
+          },
+          {
+            id: "qywx_app",
+            label: "企业微信 APP",
+            desc: "企业微信应用推送参数。",
+            keys: ["QYWX_AM", "QYWX_ORIGIN"],
+            example: "QYWX_AM=corpid,corpsecret,touser,agentid\nQYWX_ORIGIN=https://qyapi.weixin.qq.com",
+          },
+          {
+            id: "qywx_bot",
+            label: "企业微信机器人",
+            desc: "企业微信群机器人 key。",
+            keys: ["QYWX_KEY"],
+            example: "QYWX_KEY=xxxx",
+          },
+          {
+            id: "telegram",
+            label: "Telegram 机器人",
+            desc: "Telegram 机器人 token 与用户 ID。",
+            keys: [
+              "TG_BOT_TOKEN",
+              "TG_USER_ID",
+              "TG_API_HOST",
+              "TG_PROXY_AUTH",
+              "TG_PROXY_HOST",
+              "TG_PROXY_PORT"
+            ],
+            example: "TG_BOT_TOKEN=xxxx\nTG_USER_ID=123456",
+          },
+          {
+            id: "aibotk",
+            label: "智能微秘书",
+            desc: "智能微秘书 apikey 与目标。",
+            keys: ["AIBOTK_KEY", "AIBOTK_TYPE", "AIBOTK_NAME"],
+            example: "AIBOTK_KEY=xxxx\nAIBOTK_TYPE=room\nAIBOTK_NAME=测试群",
+          },
+          {
+            id: "smtp",
+            label: "SMTP 邮件",
+            desc: "SMTP 发送邮件相关配置。",
+            keys: [
+              "SMTP_SERVER",
+              "SMTP_SSL",
+              "SMTP_EMAIL",
+              "SMTP_PASSWORD",
+              "SMTP_NAME",
+              "SMTP_EMAIL_TO",
+              "SMTP_NAME_TO"
+            ],
+            example: "SMTP_SERVER=smtp.exmail.qq.com:465\nSMTP_SSL=true\nSMTP_EMAIL=me@example.com\nSMTP_PASSWORD=xxxx",
+          },
+          {
+            id: "pushme",
+            label: "PushMe",
+            desc: "PushMe key 与推送地址。",
+            keys: ["PUSHME_KEY", "PUSHME_URL"],
+            example: "PUSHME_KEY=xxxx\nPUSHME_URL=https://pushme.example.com",
+          },
+          {
+            id: "chronocat",
+            label: "CHRONOCAT",
+            desc: "Chronocat 机器人配置。",
+            keys: ["CHRONOCAT_QQ", "CHRONOCAT_TOKEN", "CHRONOCAT_URL"],
+            example: "CHRONOCAT_QQ=123456\nCHRONOCAT_TOKEN=xxxx\nCHRONOCAT_URL=https://chronocat.example.com",
+          },
+          {
+            id: "webhook",
+            label: "自定义通知",
+            desc: "自定义 Webhook 通知参数。",
+            keys: [
+              "WEBHOOK_URL",
+              "WEBHOOK_BODY",
+              "WEBHOOK_HEADERS",
+              "WEBHOOK_METHOD",
+              "WEBHOOK_CONTENT_TYPE"
+            ],
+            example: "WEBHOOK_URL=https://example.com/webhook\nWEBHOOK_METHOD=POST\nWEBHOOK_CONTENT_TYPE=application/json",
+          },
+          {
+            id: "ntfy",
+            label: "Ntfy",
+            desc: "Ntfy 服务器与 topic。",
+            keys: ["NTFY_URL", "NTFY_TOPIC", "NTFY_PRIORITY"],
+            example: "NTFY_URL=https://ntfy.sh\nNTFY_TOPIC=quark\nNTFY_PRIORITY=3",
+          },
+          {
+            id: "dodo",
+            label: "DoDo 机器人",
+            desc: "DoDo 机器人 token 与推送目标。",
+            keys: ["DODO_BOTTOKEN", "DODO_BOTID", "DODO_LANDSOURCEID", "DODO_SOURCEID"],
+            example: "DODO_BOTTOKEN=xxx\nDODO_BOTID=xxx\nDODO_LANDSOURCEID=xxx\nDODO_SOURCEID=xxx",
+          },
+          {
+            id: "wxpusher",
+            label: "WXPusher",
+            desc: "WXPusher appToken 与用户/主题。",
+            keys: ["WXPUSHER_APP_TOKEN", "WXPUSHER_TOPIC_IDS", "WXPUSHER_UIDS"],
+            example: "WXPUSHER_APP_TOKEN=xxx\nWXPUSHER_TOPIC_IDS=1;2\nWXPUSHER_UIDS=uid1;uid2",
+          },
+        ],
+        selectedPushProvider: "bark",
         confirmDialog: {
           title: "请确认",
           message: "",
@@ -856,6 +1090,9 @@
         },
       },
       computed: {
+        selectedPushProviderInfo() {
+          return this.pushProviders.find(item => item.id === this.selectedPushProvider);
+        },
         taskLastRunMap() {
           const map = {};
           this.transferLogs.forEach(log => {
@@ -1225,9 +1462,47 @@
             this.formData.cookie.splice(index, 1);
         },
         addPush() {
-          key = prompt("增加的键名", "");
-          if (key != "" && key != null)
-            this.$set(this.formData.push_config, key, "");
+          key = prompt("增加的键名（多个用逗号或空格分隔）", "");
+          if (key == null) {
+            return;
+          }
+          const keys = key.split(/[\s,;]+/).map(item => item.trim()).filter(Boolean);
+          if (!keys.length) {
+            return;
+          }
+          let added = 0;
+          keys.forEach((item) => {
+            if (!(item in this.formData.push_config)) {
+              this.$set(this.formData.push_config, item, "");
+              added += 1;
+            }
+          });
+          if (added > 0) {
+            this.showToast(`已添加 ${added} 个键名`, 'success');
+          } else {
+            this.showToast("键名已存在", 'info');
+          }
+        },
+        addPushProvider() {
+          const provider = this.pushProviders.find(item => item.id === this.selectedPushProvider);
+          if (!provider) {
+            return;
+          }
+          let added = 0;
+          provider.keys.forEach((item) => {
+            if (!(item in this.formData.push_config)) {
+              this.$set(this.formData.push_config, item, "");
+              added += 1;
+            }
+          });
+          if (added > 0) {
+            this.showToast(`已添加 ${provider.label} 的 ${added} 个键名`, 'success');
+          } else {
+            this.showToast("键名已存在", 'info');
+          }
+        },
+        openPushHelp() {
+          $('#pushHelpModal').modal('show');
         },
         removePush(key) {
           if (confirm("确认删除吗？"))
