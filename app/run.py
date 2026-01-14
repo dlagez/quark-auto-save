@@ -1,5 +1,11 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
+import sys
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, parent_dir)
+
 from flask import (
     json,
     Flask,
@@ -27,12 +33,8 @@ import logging
 import traceback
 import sqlite3
 import base64
-import sys
-import os
 import re
 
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, parent_dir)
 from quark_auto_save import Quark, Config, MagicRename
 
 print(
