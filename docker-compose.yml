@@ -1,0 +1,20 @@
+services:
+  quark-auto-save:
+    build:
+      context: https://github.com/dlagez/quark-auto-save.git
+      dockerfile: Dockerfile
+    container_name: quark-auto-save
+    restart: unless-stopped
+    ports:
+      - "5005:5005"
+    environment:
+      - TZ=Asia/Shanghai
+      - WEBUI_USERNAME=admin
+      - WEBUI_PASSWORD=admin123
+    volumes:
+      - quark_config:/app/config
+      - quark_plugins:/app/plugins
+
+volumes:
+  quark_config:
+  quark_plugins:
